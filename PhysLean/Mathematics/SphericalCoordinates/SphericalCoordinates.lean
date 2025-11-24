@@ -27,6 +27,8 @@ Spherical to cartesian conversion:
 x = r sin θ cos φ
 y = r sin θ sin φ
 z = r cos θ
+
+Distance between two spherical coordinates can be done by converting to Cartesian and doing so
 -/
 
 structure Spherical where
@@ -50,61 +52,15 @@ def Vec3.toSpherical (v : Vec3) : Spherical :=
   let r := Real.sqrt (x*x + y*y + z*z)
 
   if h : r = 0 then
-    -- Convention: θ = 0, φ = 0 at the origin
     { r := 0, theta := 0, phi := 0 }
   else
     let theta := Real.arccos (z / r)
     let phi   := Real.atan2 y x
     { r := r, theta := theta, phi := phi }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def dist (s1 s2 : Spherical) : Real :=
+  let c1 := s1.toVec3
+  let c2 := s2.toVec3
+  Vec3.dist c1 c2
 
 end Spherical
-
-
-
-
-
-
-
-
-
