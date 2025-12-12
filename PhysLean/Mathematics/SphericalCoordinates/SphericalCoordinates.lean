@@ -13,22 +13,23 @@ structure Spherical where
   r     : Real
   theta : Real
   phi   : Real
-deriving Repr
 
 namespace Spherical
 
 open EuclideanSpace
 
 noncomputable def toCartesianSpace3 (s : Spherical) : Space 3 :=
-  EuclideanSpace.vec #[ s.r * Real.sin(s.theta) * Real.cos(s.phi),
-     s.r * Real.si(s.theta) * Real.sin(s.phi),
-     s.r * Real.cos(s.theta) ]
+  ![ s.r * Real.sin(s.theta) * Real.cos(s.phi),
+    s.r * Real.sin(s.theta) * Real.sin(s.phi),
+    s.r * Real.cos(s.theta)]
 
 noncomputable def Space.toSpherical (v : Space 3) : Spherical :=
   let x := v 0
   let y := v 1
   let z := v 2
+
   let r := Real.sqrt (x*x + y*y + z*z)
+
   if _ : r = 0 then
     { r := 0, theta := 0, phi := 0 }
   else
@@ -43,6 +44,6 @@ noncomputable def Space.toSpherical (v : Space 3) : Spherical :=
     { r := r, theta := theta, phi := phi }
 
 noncomputable def dist (s1 s2 : Spherical) : Real :=
-  EuclideanSpace.dist (s1.toCartesianSpace3) (s2.toCartesianSpace3)
+  dist (s1.toCartesianSpace3) (s2.toCartesianSpace3)
 
 end Spherical
