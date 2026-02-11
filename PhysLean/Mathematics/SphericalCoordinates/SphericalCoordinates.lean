@@ -10,6 +10,7 @@ import PhysLean.SpaceAndTime.Space.Basic
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Inverse
 import Mathlib.Algebra.Group.Basic
+import Mathlib.Order.Defs.PartialOrder
 
 namespace PhysLean.Mathematics.SphericalCoordinates
 
@@ -82,6 +83,13 @@ theorem one_sub_u_sq_eq (x y : ℝ) (u : ℝ) (h : u = y / (Real.sqrt (x^2 + y^2
     rw [h]
     field_simp
 
+lemma non_zero_square_positive (y : ℝ) (h_y_nonzero: y ≠ 0) : y^2 > 0 := by
+    have ha : y^2 = 0 ↔ y = 0 := by simp
+    have hb : y^2 ≥ 0 := by nlinarith
+    have hc : y^2 ≠ 0 := by simp [ha, h_y_nonzero]
+    have h0 : (y^2 : ℝ) > 0 := sq_pos_of_ne_zero h_y_nonzero
+    simp [h0]
+
 theorem sqrt_x2_y2_add_x_ne_zero {x y : ℝ} (h : x^2 + y^2 > 0) (hx : x ≥ 0 ∨ y ≠ 0) :
   Real.sqrt (x^2 + y^2) + x > 0 := by
   cases hx with
@@ -91,15 +99,26 @@ theorem sqrt_x2_y2_add_x_ne_zero {x y : ℝ} (h : x^2 + y^2 > 0) (hx : x ≥ 0 �
     linarith
   | inr h_y_nonzero =>
     have h_sq_lt_sum : x^2 ≤ x^2 + y^2 := by nlinarith
-    generalize hu : x^2 + y^2 = u
-    have h1 : u ≥ x^2 := by nlinarith [hu]
-    
+    have h0 : (y^2 : ℝ) > 0 := by simp [non_zero_square_positive, h_y_nonzero]
+    have h1 : (x^2 + y^2) > x^2 := by nlinarith [h0]
+    have h2 : |x| ≤ √(x^2 + y^2) := abs_le_sqrt (show x^2 ≤ x^2 + y^2 from h_sq_lt_sum)
+    have h3 : |x| ≠ √(x^2 + y^2) := by
+      intro h_eq
+      rw [← Real.sqrt_sq_eq_abs] at h_eq
+      have h_sq := congr_arg (fun z => z^2) h_eq
+      simp only at h_sq
+      have h_x_sq_pos : x^2 ≥ 0 := by nlinarith
+      have h_y_sq_pos : y^2 ≥ 0 := by nlinarith
+      have h_sum_sq_pos : x^2 + y^2 ≥ 0 := by nlinarith
+      simp [h_x_sq_pos, h_sum_sq_pos] at h_sq
+      exact h_y_nonzero h_sq
+    have h4 : |x| < √(x^2 + y^2) := by simp [lt_of_le_of_ne , h2, h3]
+    have h5 : -x ≤ |x| := by exact neg_le_abs (x : ℝ)
+    have h6 : -x < √(x^2 + y^2) := by linarith [h4, h5]
+    linarith [h4]
 
-    
 
-
-
-theorem cos_atan2 (y x : ℝ) :
+theorem cos_atan2 (y x : ℝ) (h_not_both_zero : y ≠ 0 ∨ x ≠ 0) :
   Real.cos (atan2 y x) = x / Real.sqrt (x^2 + y^2) := by
   unfold atan2
   by_cases h : y = 0 ∧ x < 0
@@ -108,29 +127,88 @@ theorem cos_atan2 (y x : ℝ) :
     simp [neg_div_sqrt_sq, h]
   · -- atan2 = 2 * arctan (y / (√(x^2 + y^2) + x))
     generalize h_u : y / (√(x^2 + y^2) + x) = u
-    generalize (1 + u^2) = w
-    have h_pos : 0 ≤ (1 + u^2) := by nlinarith
-    simp [h, Real.cos_two_mul, Real.cos_arctan, h_pos, sq_sqrt]
+    have h_non_neg : 0 ≤  (1 + u^2) := by nlinarith
+    have h_pos : 0 < (1 + u^2) := by nlinarith
+    have h_one_plus_u_sq_non_zero : 1 + u^2 ≠ 0 := by linarith [h_pos]
+    simp [h, Real.cos_two_mul, Real.cos_arctan, h_non_neg, sq_sqrt]
     field_simp
     have h_two_sub : 2 - (1 + u^2) = 1 - u^2 := by linarith;
     simp [h_two_sub]
     have h_nonzero : 1 + u^2 ≠ 0 := by nlinarith;
-    have h_denom_pos : Real.sqrt (x^2 + y^2) + x ≠ 0 := by
-      by_cases h2 : x ≥ 0
-      · linarith [h h2]
-        exact sqrt_x2_y2_add_x_ne_zero h h2 
-      · 
+    have h_pos_sq_sum : x^2 + y^2 > 0 := by
+      by_cases h_x_non_zero : x ≠ 0
+      · have hx1 : x^2 > 0 := by simp [h_x_non_zero, sq_pos_of_ne_zero]
+        nlinarith [hx1]
+      · have h_x_zero : x = 0 := by simpa using h_x_non_zero
+        have h_y_non_zero : y ≠ 0 := by
+          cases h_not_both_zero with
+          | inl hy => exact hy
+          | inr hx => cases hx (by simp [h_x_zero])
+        have hy1 : y^2 > 0 := by simp [h_y_non_zero, sq_pos_of_ne_zero]
+        nlinarith [hy1]
+    have h_non_neg_sq_sum : x^2 + y^2 ≥ 0 := by linarith [h_pos_sq_sum]
+    have h_pos_rt_sq_sum : √(x^2 + y^2) > 0 := by simp [h_pos_sq_sum]
+    have h_non_zero_rt_sq_sum : √(x^2 + y^2) ≠ 0 := by linarith [h_pos_rt_sq_sum]
+    have h_reverse : x ≥ 0 ∨ y ≠ 0 := by
+      by_cases hx : x ≥ 0
+      · exact Or.inl hx
+      · exact Or.inr (by
+          intro hy_eq
+          apply h
+          constructor
+          · exact hy_eq
+          · linarith)
 
-    rw [div_eq_of_mul_eq]
-    sorry
+    have h_denom_pos : Real.sqrt (x^2 + y^2) + x > 0 := by exact sqrt_x2_y2_add_x_ne_zero h_pos_sq_sum h_reverse
+    have h_denom_non_zero : Real.sqrt (x^2 + y^2) + x ≠ 0 := by nlinarith [h_denom_pos]
+    have h_collect_terms : 1 - u^2 = (1 + u^2) * x / √(x^2 + y^2) ↔ (1 - u^2) / (1 + u^2) = x / √(x^2 + y^2) := by
+      field_simp [h_one_plus_u_sq_non_zero, h_non_zero_rt_sq_sum];
+    simp [h_collect_terms]
+    have h_one_sub_u_sq : 1 - u^2 = ((√(x^2 + y^2) + x)^2 - y^2) / ((√(x^2 + y^2) + x)^2 ) := by
+      simp [← h_u]
+      field_simp
+    have h_one_plus_u_sq : 1 + u^2 = ((√(x^2 + y^2) + x)^2 + y^2) / ((√(x^2 + y^2) + x)^2 ) := by
+      simp [← h_u]
+      field_simp
+    have h_u_division : (1 - u^2) / (1 + u^2) = ((√(x^2 + y^2) + x)^2 - y^2) / ((√(x^2 + y^2) + x)^2 + y^2) := by
+      simp [h_one_sub_u_sq, h_one_plus_u_sq]
+      field_simp
+    simp [h_u_division]
+    have h_bracket_sq_expansion : (√(x^2 + y^2) + x)^2 = 2 * x^2 + y^2 + 2 * x * √(x^2 + y^2) := by
+      ring_nf
+      field_simp
+      simp [sq_sqrt, h_non_neg_sq_sum]
+      linarith
+    have h_numerator_expansion : ((√(x^2 + y^2) + x)^2 - y^2) = 2 * x * (√(x^2 + y^2) + x) := by
+      simp [h_bracket_sq_expansion]
+      linarith
+    have h_denominator_expansion : ((√(x^2 + y^2) + x)^2 + y^2) = 2 * √(x^2 + y^2) * (√(x^2 + y^2) + x) := by
+      simp [h_bracket_sq_expansion]
+      linarith
+    simp [h_numerator_expansion, h_denominator_expansion]
+    field_simp
 
-
-
-
-
-theorem sin_atan2 (y x : ℝ) :
+theorem sin_atan2 (y x : ℝ) (h_not_both_zero : y ≠ 0 ∨ x ≠ 0) :
   Real.sin (atan2 y x) = y / Real.sqrt (x^2 + y^2) := by
-  sorry
+  unfold atan2
+  by_cases h : y = 0 ∧ x < 0
+  · -- atan2 = pi
+    simp [h]
+  · -- atan2 = 2 * arctan (y / (√(x^2 + y^2) + x))
+    generalize h_u : y / (√(x^2 + y^2) + x) = u
+    have h_non_neg : 0 ≤ 1 + u^2 := by nlinarith
+    have h_pos : 0 < 1 + u^2 := by nlinarith
+    have h_one_plus_u_sq_non_zero : 1 + u^2 ≠ 0 := by linarith [h_pos]
+
+    simp [h, Real.sin_two_mul, Real.sin_arctan]
+    field_simp [h_one_plus_u_sq_non_zero]
+
+    have h_bracket_sq_expansion : (√(x^2 + y^2) + x)^2 = x^2 + y^2 + 2 * x * √(x^2+y^2) + x^2 := by ring_nf
+    have h_denominator_expansion : (√(x^2 + y^2) + x)^2 + y^2 = 2 * √(x^2+y^2) * (√(x^2+y^2)+x) := by linarith [h_bracket_sq_expansion]
+    have h_numerator_expansion : 2 * y * (√(x^2+y^2)+x) = 2 * y * (√(x^2+y^2)+x) := by rfl
+
+    field_simp [h_numerator_expansion, h_denominator_expansion]
+
 
 
 noncomputable def toVec3 (s : Spherical) : Vec3 :=
