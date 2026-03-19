@@ -12,6 +12,7 @@ import Mathlib.Analysis.SpecialFunctions.Trigonometric.Inverse
 import Mathlib.Algebra.Group.Basic
 import Mathlib.Order.Defs.PartialOrder
 import Mathlib.Tactic.LinearCombination'
+import PhysLean.SpaceAndTime.Space.Derivatives.Basic
 namespace PhysLean.Mathematics.SphericalCoordinates
 
 --#count_heartbeats
@@ -47,32 +48,29 @@ noncomputable def atan2 (y x : ℝ) : ℝ :=
   else
     2 * Real.arctan (y / (Real.sqrt (x^2 + y^2) + x))
 
-lemma atan2_empty_zero : atan2 0 0 = 0 := by simp [atan2]
+lemma atan2_empty_zero : atan2 0 0 = 0 := by simp only [atan2, lt_self_iff_false, and_false, ↓reduceIte, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true, zero_pow, add_zero, sqrt_zero, div_zero, arctan_zero, mul_zero]
 
 theorem atan2_lower_bound (y x : ℝ) : -Real.pi < atan2 y x := by
-  unfold atan2
   by_cases h : y = 0 ∧ x < 0
   · -- atan2 = pi
-    simp [h]
+    simp [atan2, h]
     linarith [Real.pi_pos]
   · -- atan2 = 2 * arctan (y / (√(x^2 + y^2) + x))
-    simp [h]
+    simp [atan2, h]
     generalize y / (Real.sqrt (x^2 + y^2) + x) = u
     linarith [Real.neg_pi_div_two_lt_arctan u]
 
 theorem atan2_upper_bound (y x : ℝ) : atan2 y x ≤ Real.pi := by
-  unfold atan2
   by_cases h : y = 0 ∧ x < 0
   · -- atan2 = pi
-    simp [h]
+    simp [atan2, h]
   · -- atan2 = 2 * arctan (y / (√(x^2 + y^2) + x))
-    simp [h]
+    simp [atan2, h]
     generalize y / (√(x^2 + y^2) + x) = u
     linarith [Real.arctan_lt_pi_div_two u]
 
 theorem atan2_upper_bound' (y x : ℝ) (h_xy : (¬(y = 0 ∧ x < 0))) : atan2 y x < Real.pi := by
-  unfold atan2
-  simp [h_xy]
+  simp [atan2, h_xy]
   generalize y / (√(x^2 + y^2) + x) = u
   linarith [Real.arctan_lt_pi_div_two u]
 
@@ -80,58 +78,45 @@ theorem atan2_bounds (y x : ℝ) :
   -Real.pi < atan2 y x ∧ atan2 y x ≤ Real.pi := by
   exact ⟨atan2_lower_bound y x, atan2_upper_bound y x⟩
 
-lemma neg_div_sqrt_sq (x : ℝ) (hx : x < 0) : x / Real.sqrt (x^2) = -1 := by
+lemma neg_div_sqrt_sq (x : ℝ) (h_x : x < 0) : x / Real.sqrt (x^2) = -1 := by
   rw [Real.sqrt_sq_eq_abs x]
-  rw [abs_of_neg hx]
-  field_simp [hx, ne_of_lt]
+  rw [abs_of_neg h_x]
+  field_simp [h_x, ne_of_lt]
 
 lemma non_zero_square_positive (y : ℝ) (h_y_nonzero: y ≠ 0) : y^2 > 0 := by simp [sq_pos_of_ne_zero, h_y_nonzero]
 
-theorem sqrt_x2_y2_add_x_ne_zero {x y : ℝ} (h : x^2 + y^2 > 0) (hx : x ≥ 0 ∨ y ≠ 0) :
+theorem sqrt_x2_y2_add_x_ne_zero {x y : ℝ} (h : x^2 + y^2 > 0) (h_x : x ≥ 0 ∨ y ≠ 0) :
   Real.sqrt (x^2 + y^2) + x > 0 := by
-  cases hx with
+  cases h_x with
   | inl h_x_nonneg =>
     linarith [Real.sqrt_pos.mpr h]
   | inr h_y_nonzero =>
-    have h_le : |x| ≤ √(x^2 + y^2) := (by nlinarith [abs_le_sqrt (show x^2 ≤ x^2 + y^2 from (by nlinarith))])
-    have h_ne : |x| ≠ √(x^2 + y^2) := by
-      intro h_eq
-      rw [← Real.sqrt_sq_eq_abs] at h_eq
-      rw [Real.sqrt_inj (by nlinarith [Real.sqrt_nonneg]) (by nlinarith [Real.sqrt_nonneg])] at h_eq
-      rw [add_comm] at h_eq
-      rw [← sub_eq_iff_eq_add] at h_eq
-      rw [sub_self] at h_eq
-      rw [eq_comm] at h_eq
-      simp at h_eq
-      contradiction
-    have h_lt : |x| < √(x^2 + y^2) := by simp [lt_of_le_of_ne , h_le, h_ne]
+    have h_lt : |x| < √(x^2 + y^2) := by
+      rw [← Real.sqrt_sq_eq_abs, sqrt_lt_sqrt_iff]
+      simpa using sq_pos_of_ne_zero h_y_nonzero
+      exact sq_nonneg x
     have h_le_abs : -x ≤ |x| := (by exact neg_le_abs (x : ℝ))
     linarith [h_lt, h_le_abs]
 
 lemma pos_square_sum (y x : ℝ) (h_not_both_zero : y ≠ 0 ∨ x ≠ 0) :
-  x^2 + y^2 > 0 := by
+  0 < x^2 + y^2 := by
     by_cases h_x_non_zero : x ≠ 0
     · nlinarith [sq_pos_of_ne_zero h_x_non_zero]
-    · have h_y_non_zero : y ≠ 0 := by
-        cases h_not_both_zero with
-        | inl hy => exact hy
-        | inr hx =>
-            rw [ne_eq, not_not] at h_x_non_zero
-            exact (hx h_x_non_zero).elim
-      nlinarith [h_y_non_zero, sq_pos_of_ne_zero h_y_non_zero]
+    · simp [h_x_non_zero] at h_not_both_zero
+      push_neg at h_not_both_zero
+      nlinarith [h_not_both_zero, sq_pos_of_ne_zero h_not_both_zero]
 
 theorem cos_atan2_non_empty (y x : ℝ) (h_not_both_zero : y ≠ 0 ∨ x ≠ 0) :
   Real.cos (atan2 y x) = x / Real.sqrt (x^2 + y^2) := by
-  unfold atan2
   by_cases h : y = 0 ∧ x < 0
   · -- atan2 = pi
-    simp [h]
+    simp [atan2,h]
     simp [neg_div_sqrt_sq, h]
   · -- atan2 = 2 * arctan (y / (√(x^2 + y^2) + x))
+    simp [atan2]
     generalize h_u : y / (√(x^2 + y^2) + x) = u
-    simp [h, Real.cos_two_mul, Real.cos_arctan]
     have h_non_neg : 0 ≤ (1 + u^2) := by nlinarith
-    simp [h_non_neg, sq_sqrt]
+    simp [h, Real.cos_two_mul, Real.cos_arctan, h_non_neg, sq_sqrt]
     field_simp
     rw [tsub_add_eq_tsub_tsub]
     norm_num
@@ -139,42 +124,28 @@ theorem cos_atan2_non_empty (y x : ℝ) (h_not_both_zero : y ≠ 0 ∨ x ≠ 0) 
 
     have h_pos_rt_sq_sum : √(x^2 + y^2) > 0 := by simp [pos_square_sum, h_not_both_zero]
     have h_denom_non_zero : Real.sqrt (x^2 + y^2) + x ≠ 0 := by exact ne_of_gt (sqrt_x2_y2_add_x_ne_zero (by simp [pos_square_sum, h_not_both_zero]) h)
-    have h_collect_terms : 1 - u^2 = (1 + u^2) * x / √(x^2 + y^2) ↔ (1 - u^2) / (1 + u^2) = x / √(x^2 + y^2) := by
-      have h_non_zero_rt_sq_sum : √(x^2 + y^2) ≠ 0 := by linarith [h_pos_rt_sq_sum]
-      have h_one_plus_u_sq_non_zero : 1 + u^2 ≠ 0 := by nlinarith;
-      field_simp [h_one_plus_u_sq_non_zero, h_non_zero_rt_sq_sum];
+    have h_collect_terms : 1 - u^2 = (1 + u^2) * x / √(x^2 + y^2) ↔ (1 - u^2) / (1 + u^2) = x / √(x^2 + y^2) := by grind
 
-    simp [h_collect_terms]
     rw [← h_u]
     field_simp
 
-    have h_bracket_sq_expansion : (√(x^2 + y^2) + x)^2 = 2 * x^2 + y^2 + 2 * x * √(x^2 + y^2) := by
-      ring_nf
-      field_simp
-      have h_non_neg_sq_sum : x^2 + y^2 ≥ 0 := by linarith [sq_nonneg x, sq_nonneg y]
-      simp [sq_sqrt, h_non_neg_sq_sum]
-      linarith
-
-    simp [h_bracket_sq_expansion]
-    field_simp [h_bracket_sq_expansion]
-    nlinarith [h_bracket_sq_expansion]
+    have h_bracket_sq_expansion : (√(x^2 + y^2) + x)^2 = 2 * x^2 + y^2 + 2 * x * √(x^2 + y^2) := by grind
+    grind
 
 theorem cos_atan2 (y x : ℝ) :
   Real.cos (atan2 y x) = if y ≠ 0 ∨ x ≠ 0 then x / Real.sqrt (x^2 + y^2) else 1 := by
     by_cases h_non_empty: y ≠ 0 ∨ x ≠ 0
-    · simp [h_non_empty]
-      exact cos_atan2_non_empty y x h_non_empty
-    · simp [h_non_empty]
-      push_neg at h_non_empty
+    · simpa [h_non_empty] using cos_atan2_non_empty y x h_non_empty
+    · push_neg at h_non_empty
       simp [atan2_empty_zero, h_non_empty]
 
 theorem sin_atan2_non_empty (y x : ℝ) (h_not_both_zero : y ≠ 0 ∨ x ≠ 0) :
   Real.sin (atan2 y x) = y / Real.sqrt (x^2 + y^2) := by
-  unfold atan2
   by_cases h : y = 0 ∧ x < 0
   · -- atan2 = pi
-    simp [h]
+    simp [atan2, h]
   · -- atan2 = 2 * arctan (y / (√(x^2 + y^2) + x))
+    simp [atan2]
     generalize h_u : y / (√(x^2 + y^2) + x) = u
     have h_one_plus_u_sq_non_zero : 1 + u^2 ≠ 0 := by nlinarith
     field_simp [h_one_plus_u_sq_non_zero]
@@ -188,25 +159,19 @@ theorem sin_atan2_non_empty (y x : ℝ) (h_not_both_zero : y ≠ 0 ∨ x ≠ 0) 
 
     rw [not_and_or, ← ne_eq, not_lt, Or.comm] at h
 
-    have h_pos_sq_sum : x^2 + y^2 > 0 := by simp [pos_square_sum, h_not_both_zero]
+    have h_pos_sq_sum : 0 < x^2 + y^2 := by simp [pos_square_sum, h_not_both_zero]
     have h_denom_non_zero : Real.sqrt (x^2 + y^2) + x ≠ 0 := by exact ne_of_gt (sqrt_x2_y2_add_x_ne_zero h_pos_sq_sum h)
 
     by_cases h_y_zero : y = 0
     · simp [h_y_zero]
-    · field_simp [h_y_zero]
-      ring_nf
-      have h_sq_sqrt_sum : √(x^2 + y^2) ^ 2 = x^2 + y^2 := Real.sq_sqrt (by nlinarith [h_pos_sq_sum])
-      linarith [h_sq_sqrt_sum]
+    · grind
 
 theorem sin_atan2 (y x : ℝ) :
   Real.sin (atan2 y x) = if y ≠ 0 ∨ x ≠ 0 then y / Real.sqrt (x^2 + y^2) else 0 := by
     by_cases h_non_empty: y ≠ 0 ∨ x ≠ 0
-    · simp [h_non_empty]
-      exact sin_atan2_non_empty y x h_non_empty
-    · simp [h_non_empty]
-      push_neg at h_non_empty
+    · simpa [h_non_empty] using sin_atan2_non_empty y x h_non_empty
+    · push_neg at h_non_empty
       simp [atan2_empty_zero, h_non_empty]
-
 
 noncomputable def toVec3 (s : Spherical) : Vec3 :=
   ⟨![
@@ -223,35 +188,84 @@ lemma sq_le_then_le_sqrt (a : ℝ) (b : ℝ) (h_a : 0 ≤ a) (h_b : 0 ≤ b) :
   exact (le_sqrt h_a h_b).mpr h_sq
 
 lemma abs_z_over_r_bounds (x : ℝ) (y : ℝ) (z : ℝ)
-  (r : ℝ) (h_r_def : r = √(x^2+y^2+z^2)) (h_r_non_zero : r ≠ 0) :
+  (r : ℝ) (h_r_def : r = √(x^2 + y^2 + z^2)) (h_r_non_zero : r ≠ 0) :
   abs (z / r) ≤ 1 := by
-    have h_r_nonneg : 0 ≤ r := by simp [h_r_def]
-    have r_pos : 0 < r := lt_of_le_of_ne h_r_nonneg h_r_non_zero.symm
+    have r_pos : 0 < r := lt_of_le_of_ne (by simp [h_r_def]) h_r_non_zero.symm
     have h_sq : z^2 ≤ x^2 + y^2 + z^2 := by nlinarith
     simp [abs_div, abs_of_pos, r_pos]
     field_simp
-    simp [h_r_def]
-    simp [abs_le]
+    simp [h_r_def, abs_le]
+    have h_simplify (a : ℝ) : a ≤ √(x ^ 2 + y ^ 2 + a^2) := by
+      by_cases h_a : a < 0
+      · grind [sqrt_nonneg]
+      · push_neg at h_a
+        apply sq_le_then_le_sqrt (a) (x^2 + y^2 + a^2)
+        exact h_a
+        nlinarith
+        nlinarith
     constructor
-    · simp [neg_le]
-      have neg_z_le_sqrt : -z ≤ Real.sqrt (x^2 + y^2 + z^2) := by
-        by_cases hz : z ≥ 0
-        · linarith
-        · have h_case_resolved : -z ≤ sqrt (x^2 + y^2 + z^2) :=
-            sq_le_then_le_sqrt (-z : ℝ) (x^2 + y^2 + z^2) (by linarith) (by nlinarith) (by
-              rw [neg_sq]
-              exact h_sq)
-          simp [h_case_resolved]
-      simp [neg_z_le_sqrt]
-    · have h_z_below : z ≤ sqrt (x^2 + y^2 + z^2) := by
-        by_cases h_z : z ≥ 0
-        · exact sq_le_then_le_sqrt z (x^2 + y^2 + z^2) (by simp [h_z]) (by nlinarith) h_sq
-        · have h_z_le_sqrt_sum : -z ≤ sqrt (x^2 + y^2 + z^2) :=
-            sq_le_then_le_sqrt (-z : ℝ) (x^2 + y^2 + z^2) (by linarith) (by nlinarith) (by
-              rw [neg_sq]
-              exact h_sq)
-          linarith [h_z_le_sqrt_sum, h_z]
-      simp [h_z_below]
+    · rw [← neg_le_neg_iff]
+      simp
+      grind [neg_sq]
+    · by_cases h_z : z < 0
+      · grind
+      · exact h_simplify z
+
+theorem theta_zero_or_pi_implies_phi_zero
+  (x : ℝ) (y : ℝ) (z : ℝ) (r : ℝ) (theta : ℝ) (phi : ℝ)
+  (h_r_val : r = √(x^2 + y^2 + z^2)) (h_r_bounds : 0 ≤ r) (h_r_non_zero : r ≠ 0)
+  (h_theta_def : theta = Real.arccos (z / r))
+  (h_phi_def : phi = atan2 y x) :
+  theta = 0 ∨ theta = π → phi = 0 := by
+    intro h_theta
+    simp [h_phi_def]
+
+    -- -1 ≤ z / r ≤ 1
+    have h_abs_z_over_r_bounds : abs (z / r) ≤ 1 := abs_z_over_r_bounds x y z r h_r_val h_r_non_zero
+
+    have h_z_div_r_pos : theta = 0 → z / r = 1 := by
+      intro h_zero
+      have h_fraction_div_zero : Real.arccos (z / r) = 0 → (z / r) = 1 := by
+        intro h_frac_div
+        have h_cos_theta : z / r = Real.cos theta := by simp [h_theta_def, Real.cos_arccos, (abs_le.mp h_abs_z_over_r_bounds).1, (abs_le.mp h_abs_z_over_r_bounds).2]
+        simp [h_cos_theta, h_zero]
+      apply h_fraction_div_zero
+      simp [← h_zero, h_theta_def]
+
+    have h_z_div_r_neg : theta = π → z / r = -1 := by
+      intro h_pi
+      have h_fraction_div_pi : Real.arccos (z / r) = Real.pi → z / r = -1 := by
+        intro h_frac
+        have h_cos_theta : z / r = Real.cos theta := by simp [h_theta_def, Real.cos_arccos, (abs_le.mp h_abs_z_over_r_bounds).1, (abs_le.mp h_abs_z_over_r_bounds).2]
+        simp [h_cos_theta, h_pi]
+      apply h_fraction_div_pi
+      simp [← h_pi, h_theta_def]
+
+    have h_z_r_pos : theta = 0 → z = r  := (by intro h_theta_zero; field_simp at h_z_div_r_pos; simp [h_theta_zero, h_z_div_r_pos])
+    have h_z_r_neg : theta = π → z = -r := (by intro h_theta_pi; field_simp at h_z_div_r_neg; simp [h_theta_pi, h_z_div_r_neg])
+
+    have h_r_square : r^2 = x^2 + y^2 + z^2 := by
+      have h_sum_sq : √(x^2 + y^2 + z^2)^2 = x^2 + y^2 + z^2 := by simpa using Real.sq_sqrt (by nlinarith)
+      simp [h_r_val, h_sum_sq]
+
+    have h_x_y_sq : x^2 + y^2 = 0 := by
+      have h_add_z : x^2 + y^2 + z^2 = z^2 → x^2 + y^2 = 0 := by
+        intro _
+        linarith
+      apply h_add_z
+      simp [h_r_square.symm]
+      cases h_theta with
+      | inl h_theta_zero =>
+        rw [sq_eq_sq₀ (by linarith) (by grind)]
+        simp [h_theta_zero, h_z_r_pos]
+      | inr h_theta_pi =>
+        rw [sq_eq_sq_iff_eq_or_eq_neg.mpr]
+        simp [h_theta_pi, h_z_r_neg]
+
+    have h_x_zero : x = 0 := by nlinarith [h_x_y_sq]
+    have h_y_zero : y = 0 := by nlinarith [h_x_y_sq]
+
+    simp [atan2_empty_zero, h_x_zero, h_y_zero]
 
 theorem theta_zero_implies_phi_zero
   (x : ℝ) (y : ℝ) (z : ℝ) (r : ℝ) (theta : ℝ) (phi : ℝ)
@@ -259,41 +273,8 @@ theorem theta_zero_implies_phi_zero
   (h_theta_def : theta = Real.arccos (z / r))
   (h_phi_def : phi = atan2 y x) :
   theta = 0 → phi = 0 := by
-    intro h_theta
-    simp [h_phi_def]
-
-    -- -1 ≤ z / r ≤ 1
-    have h_abs_z_over_r_bounds : abs (z / r) ≤ 1 := abs_z_over_r_bounds x y z r h_r_val h_r_non_zero
-
-    have h_z_div_r : z / r = 1 := by
-      have h_fraction_div_zero : Real.arccos (z / r) = 0 → (z / r) = 1 := by
-        intro h_frac_div
-        --rw [← cos_zero, ← h_frac_div]
-        --rw [cos_arccos (by linarith [abs_le.mp, h_abs_z_over_r_bounds]) (by linarith [abs_le.mpr h_abs_z_over_r_bounds])]
-        have h_cos_theta : z / r = Real.cos theta := by simp [h_theta_def, Real.cos_arccos, (abs_le.mp h_abs_z_over_r_bounds).1, (abs_le.mp h_abs_z_over_r_bounds).2]
-        simp [h_cos_theta, h_theta]
-      apply h_fraction_div_zero
-      simp [← h_theta, h_theta_def]
-
-    have h_z_r : z = r := (by field_simp at h_z_div_r; simp [h_z_div_r])
-
-    have h_r_square : r^2 = x^2 + y^2 + z^2 := by
-      have h_sum_sq : √(x^2 + y^2 + z^2)^2 = x^2 + y^2 + z^2 := by simpa using Real.sq_sqrt (by nlinarith)
-      simp [h_r_val, h_sum_sq]
-
-    have h_x_y_sq : x^2 + y^2 = 0 := by
-      have h_add_z : x^2 + y^2 + z^2 = z^2 → x^2 + y^2 = 0 := by
-        intro _
-        linarith
-      apply h_add_z
-      simp [h_r_square.symm]
-      rw [sq_eq_sq₀ (by linarith) (by linarith)]
-      simp [h_z_r]
-
-    have h_x_0 : x = 0 := by nlinarith [h_x_y_sq]
-    have h_y_0 : y = 0 := by nlinarith [h_x_y_sq]
-
-    simp [atan2_empty_zero, h_x_0, h_y_0]
+    intro theta_zero
+    exact theta_zero_or_pi_implies_phi_zero x y z r theta phi h_r_val h_r_bounds h_r_non_zero h_theta_def h_phi_def (by simp [theta_zero])
 
 theorem theta_pi_implies_phi_zero
   (x : ℝ) (y : ℝ) (z : ℝ) (r : ℝ) (theta : ℝ) (phi : ℝ)
@@ -301,65 +282,8 @@ theorem theta_pi_implies_phi_zero
   (h_theta_def : theta = Real.arccos (z / r))
   (h_phi_def : phi = atan2 y x) :
   theta = Real.pi → phi = 0 := by
-    intro h_theta
-
-    -- -1 ≤ z / r ≤ 1
-    have r_pos : 0 < r := lt_of_le_of_ne h_r_bounds h_r_non_zero.symm
-    have h_abs_z_over_r_bounds : abs (z / r) ≤ 1 := by
-      simp [abs_div, abs_of_pos, r_pos]
-      field_simp
-      simp [h_r_val]
-      simp [abs_le]
-      have h_sq : z^2 ≤ x^2 + y^2 + z^2 := by nlinarith
-      constructor
-      · simp [neg_le]
-        have neg_z_le_sqrt : -z ≤ Real.sqrt (x^2 + y^2 + z^2) := by
-          by_cases hz : z ≥ 0
-          · linarith
-          · have h_case_resolved : -z ≤ sqrt (x^2 + y^2 + z^2) :=
-              sq_le_then_le_sqrt (-z : ℝ) (x^2 + y^2 + z^2) (by linarith) (by nlinarith) (by
-                rw [neg_sq]
-                exact h_sq)
-            simp [h_case_resolved]
-        simp [neg_z_le_sqrt]
-      · have h_z_below : z ≤ sqrt (x^2 + y^2 + z^2) := by
-          by_cases h_z : z ≥ 0
-          · exact sq_le_then_le_sqrt z (x^2 + y^2 + z^2) (by simp [h_z]) (by nlinarith) h_sq
-          · have h_z_le_sqrt_sum : -z ≤ sqrt (x^2 + y^2 + z^2) :=
-              sq_le_then_le_sqrt (-z : ℝ) (x^2 + y^2 + z^2) (by linarith) (by nlinarith) (by
-                rw [neg_sq]
-                exact h_sq)
-            linarith [h_z_le_sqrt_sum, h_z]
-        simp [h_z_below]
-
-    have h_z_div_r : z / r = -1 := by
-      have h_fraction_div_pi : Real.arccos (z / r) = Real.pi → z / r = -1 := by
-        intro h_frac
-        have h_cos_theta : z / r = Real.cos theta := by simp [h_theta_def, Real.cos_arccos, (abs_le.mp h_abs_z_over_r_bounds).1, (abs_le.mp h_abs_z_over_r_bounds).2]
-        simp [h_cos_theta, h_theta]
-      apply h_fraction_div_pi
-      simp [← h_theta, h_theta_def]
-
-    have h_z_r : z = -r := (by field_simp at h_z_div_r; simp [h_z_div_r])
-
-    have h_r_square : r^2 = x^2 + y^2 + z^2 := by
-      have h_sum_sq : √(x^2 + y^2 + z^2)^2 = x^2 + y^2 + z^2 := by simpa using Real.sq_sqrt (by nlinarith)
-      simp [h_r_val, h_sum_sq]
-
-    have h_x_y_sq : x^2 + y^2 = 0 := by
-      have h_add_z : x^2 + y^2 + z^2 = z^2 → x^2 + y^2 = 0 := by
-        intro _
-        linarith
-      apply h_add_z
-      simp [h_r_square.symm]
-      rw [sq_eq_sq_iff_eq_or_eq_neg.mpr]
-      simp [h_z_r]
-
-    have h_x_0 : x = 0 := by nlinarith [h_x_y_sq]
-    have h_y_0 : y = 0 := by nlinarith [h_x_y_sq]
-
-    simp [h_phi_def, h_x_0, h_y_0, atan2_empty_zero]
-
+    intro theta_pi
+    exact theta_zero_or_pi_implies_phi_zero x y z r theta phi h_r_val h_r_bounds h_r_non_zero h_theta_def h_phi_def (by simp [theta_pi])
 
 lemma sq_eq_pow_two (a : ℝ) : a * a = a^2 := by linarith
 
@@ -392,7 +316,7 @@ noncomputable def Vec3.toSpherical (v : Vec3) : Spherical :=
         intro h0
         exfalso
         exact hr h0,
-      theta_zero_bound := theta_zero_implies_phi_zero x y z r theta phi (by simp [r, sq_eq_pow_two]) (by apply Real.sqrt_nonneg) (by simp [hr]) (by simp [theta]) (by simp [phi])
+      theta_zero_bound := theta_zero_implies_phi_zero x y z r theta phi (by simp [r, sq_eq_pow_two]) (by apply Real.sqrt_nonneg) (by simp [hr]) (by simp [theta]) (by simp [phi]),
       theta_pi_bound   := theta_pi_implies_phi_zero   x y z r theta phi (by simp [r, sq_eq_pow_two]) (by apply Real.sqrt_nonneg) (by simp [hr]) (by simp [theta]) (by simp [phi])
     }
 
@@ -415,18 +339,24 @@ lemma equal_Vec3s
   v = v_new := by
     ext i : 3
     fin_cases i
-    · simp
-      change Spherical.x v = Spherical.x v_new
-      exact h_x
-    · simp
-      exact h_y
-    · simp
-      exact h_z
+    · simpa using h_x
+    · simpa using h_y
+    · simpa using h_z
 
 lemma sin_zero_or_pi (x : ℝ) (h_x : x = 0 ∨ x = Real.pi) : Real.sin x = 0 := by
   cases h_x with
   | inl h_zero => simp [h_zero]
   | inr h_pi => simp [h_pi]
+
+lemma r_zero_then_Vec3_zero (r x y z: ℝ) (h_r_def : r = Real.sqrt (x*x + y*y + z*z)) :
+  r = 0 → x = 0 ∧ y = 0 ∧ z = 0 := by
+  intro h_r_zero
+  have h_sq : x^2 + y^2 + z^2 = 0 := by
+    have h_r_sq : r^2 = 0 := by simp [h_r_zero]
+    rw [← pow_two, ← pow_two, ← pow_two, h_r_zero, eq_comm, sqrt_eq_zero] at h_r_def
+    exact h_r_def
+    nlinarith
+  exact ⟨(by nlinarith), (by nlinarith), (by nlinarith)⟩
 
 theorem toVec3_leftInverse : Function.LeftInverse toVec3 Vec3.toSpherical := by
   intro v
@@ -435,29 +365,17 @@ theorem toVec3_leftInverse : Function.LeftInverse toVec3 Vec3.toSpherical := by
   let z_og := Spherical.z v
   let s := Vec3.toSpherical v
   let r := s.r
-  have h_r_def : r = Real.sqrt (x_og*x_og + y_og*y_og + z_og*z_og) := by
-    subst r
-    change (v.toSpherical).r = Real.sqrt (x_og*x_og + y_og*y_og + z_og*z_og)
-    simp [Vec3.toSpherical, x_og, y_og, z_og]
-    by_cases h_sqrt_sum_zero : Real.sqrt (x v * x v + y v * y v + z v * z v) = 0
-    · simp [h_sqrt_sum_zero]
-    · simp [h_sqrt_sum_zero]
 
-  have h_r_non_neg : 0 ≤ r := by simp [h_r_def]
+  have h_r_def : r = Real.sqrt (x_og*x_og + y_og*y_og + z_og*z_og) := by
+    simp [r, s, Vec3.toSpherical]
+    split_ifs <;> rfl
+
   have h_sum_non_neg : 0 ≤ x_og*x_og + y_og*y_og + z_og*z_og := by nlinarith
   have h_sum_sq_non_neg : 0 ≤ x_og^2 + y_og^2 + z_og^2 := by nlinarith
   have h_r_sq : r^2 = x_og*x_og + y_og*y_og + z_og*z_og := by simp [h_r_def, Real.sq_sqrt, h_sum_non_neg]
 
-  have h_all_v_zero : r = 0 → x_og = 0 ∧ y_og = 0 ∧ z_og = 0 := by
-      intro h_r_zero
-      have h_sq : x_og^2 + y_og^2 + z_og^2 = 0 := by
-        have h_r_sq : r^2 = 0 := by simp [h_r_zero]
-        linarith [h_r_def]
-      exact ⟨(by nlinarith), (by nlinarith), (by nlinarith)⟩
-
   by_cases h_r : r = 0
-  · have h_all_zero : s.theta = 0 ∧ s.phi = 0 := s.r_zero_bound h_r
-    let v_new := toVec3 s
+  · let v_new := toVec3 s
     let x_new := Spherical.x v_new
     let y_new := Spherical.y v_new
     let z_new := Spherical.z v_new
@@ -466,11 +384,10 @@ theorem toVec3_leftInverse : Function.LeftInverse toVec3 Vec3.toSpherical := by
       have h_x_formula : x_new = s.r * Real.sin s.theta * Real.cos s.phi := (by simp [x_new, Spherical.x]; rfl)
       have h_y_formula : y_new = s.r * Real.sin s.theta * Real.sin s.phi := (by simp [y_new, Spherical.y]; rfl)
       have h_z_formula : z_new = s.r * Real.cos s.theta := (by simp [z_new, Spherical.z]; rfl)
-      simp [h_x_formula, h_y_formula, h_z_formula, h_all_zero.1, h_all_zero.2]
-      simp [h_all_v_zero, h_r, r]
+      simp [h_x_formula, h_y_formula, h_z_formula, s.r_zero_bound h_r]
+      simp [r_zero_then_Vec3_zero r x_og y_og z_og h_r_def, h_r, r]
 
-    change v_new = v
-    exact equal_Vec3s v_new v (by simp [h_coords_unchanged.1, x_og, x_new]) (by simp [h_coords_unchanged.2, y_og, y_new]) (by simp [h_coords_unchanged.2.2, z_og, z_new])
+    simpa using equal_Vec3s v_new v (by simp [h_coords_unchanged.1, x_og, x_new]) (by simp [h_coords_unchanged.2, y_og, y_new]) (by simp [h_coords_unchanged.2.2, z_og, z_new])
 
   · let v_new := toVec3 s
     let x_new := Spherical.x v_new
@@ -478,111 +395,55 @@ theorem toVec3_leftInverse : Function.LeftInverse toVec3 Vec3.toSpherical := by
     let z_new := Spherical.z v_new
 
     have h_r_non_zero : √(x v * x v + y v * y v + z v * z v) ≠ 0 := by
-      change √(x_og * x_og + y_og * y_og + z_og * z_og) ≠ 0
-      intro h_eq
-      rw [h_r_def.symm] at h_eq
-      contradiction
+      simpa [h_r_def] using h_r
     have h_theta_def : s.theta = Real.arccos (z_og / r) := by
-      change v.toSpherical.theta = Real.arccos (z_og / r)
-      simp [Vec3.toSpherical, z_og, h_r_non_zero]
-      change arccos (z_og / √(x_og * x_og + y_og * y_og + z_og * z_og)) = arccos (z_og / r)
-      rw [h_r_def.symm]
+      simp [s, Vec3.toSpherical, x_og, y_og, z_og, h_r_non_zero, h_r_def]
     have h_phi_def : s.phi = atan2 y_og x_og := by
-      change v.toSpherical.phi = atan2 y_og x_og
-      simp [Vec3.toSpherical, x_og, y_og, h_r_non_zero]
+      simp [s, Vec3.toSpherical, x_og, y_og, h_r_non_zero]
 
     have h_term_one_max : y_og ≠ 0 ∨ x_og ≠ 0 → z_og^2 / (x_og^2 + y_og^2 + z_og^2) ≤ 1 := by
       intro h_non_empty
       rw [div_le_one, add_comm, ← sub_nonneg, add_comm, add_sub_assoc]
       simp
-      nlinarith []
+      nlinarith
       cases h_non_empty with
       | inr h_y => nlinarith [h_y, sq_pos_iff.mpr h_y]
       | inl h_x => nlinarith [h_x, sq_pos_iff.mpr h_x]
 
-    --!!!!!!
     let large_term := √(x_og ^ 2 + y_og ^ 2 + z_og ^ 2) * (√(1 - z_og ^ 2 / (x_og ^ 2 + y_og ^ 2 + z_og ^ 2)) / √(x_og ^ 2 + y_og ^ 2))
     have h_large_term_one : x_og ≠ 0 ∨ y_og ≠ 0 → large_term = 1 := by
       intro h_xy
-      change √(x_og ^ 2 + y_og ^ 2 + z_og ^ 2) * (√(1 - z_og ^ 2 / (x_og ^ 2 + y_og ^ 2 + z_og ^ 2)) / √(x_og ^ 2 + y_og ^ 2)) = 1
+      subst large_term
       rw [← sqrt_div, ← sqrt_mul]
-      have h_one_merge : (1 - z_og ^ 2 / (x_og ^ 2 + y_og ^ 2 + z_og ^ 2)) = ((x_og ^ 2 + y_og ^ 2) / (x_og ^ 2 + y_og ^ 2 + z_og ^ 2)) := by
-        field_simp
-        rw [one_sub_div]
-        simp
-        intro h_ne
-        rw [pow_two, pow_two, pow_two, ← sqrt_inj (by nlinarith) (by simp), sqrt_zero] at h_ne
-        rw [← h_r_def] at h_ne
-        contradiction
-      simp [h_one_merge]
-      have h_non_zero_trio : (x_og ^ 2 + y_og ^ 2 + z_og ^ 2) ≠ 0 := by grind
+      have h_one_merge : (1 - z_og ^ 2 / (x_og ^ 2 + y_og ^ 2 + z_og ^ 2)) = ((x_og ^ 2 + y_og ^ 2) / (x_og ^ 2 + y_og ^ 2 + z_og ^ 2)) := by grind
+      rw [h_one_merge]
       have h_non_zero_duo : (x_og ^ 2 + y_og ^ 2) ≠ 0 := by
         have h_g_zero : y_og ^ 2 + x_og ^ 2 > 0 := pos_square_sum x_og y_og h_xy
         nlinarith [h_g_zero]
-      field_simp [h_non_zero_trio, h_non_zero_duo, h_xy]
+      grind
       nlinarith
-      rw [sub_nonneg]
       grind
 
     have h_x : x_new = x_og := by
       have h_x_formula : x_new = s.r * Real.sin s.theta * Real.cos s.phi := by (simp [x_new, Spherical.x]; rfl)
       simp [h_x_formula, h_theta_def, h_phi_def]
       simp [Real.sin_arccos, cos_atan2]
-      by_cases h_non_empty : y_og ≠ 0 ∨ x_og ≠ 0
-      · simp [h_non_empty, r, h_r_def]
-        field_simp
-        simp [Real.sq_sqrt, h_sum_sq_non_neg]
-        by_cases h_x_zero : x_og = 0
-        · simp [h_x_zero]
-        · simp [mul_div_assoc]
-          rw [mul_assoc]
-          change x_og * large_term = x_og
-          simp [h_large_term_one (Or.comm.mp h_non_empty)]
-      · simp [h_non_empty, r, h_r_def]
-        push_neg at h_non_empty
-        simp [h_non_empty.2, h_non_empty.1]
-        have h_second_case : z_og ≠ 0 → √(1 - (z_og / √(z_og * z_og)) ^ 2) = 0 := by
-          intro h_z_non_neg
-          have h_z_sq_sqrt : √(z_og ^ 2) ^ 2 = z_og^2 := by rw [sq_sqrt (by nlinarith)]
-          rw [← pow_two, div_pow, sq_sqrt (by nlinarith), div_self]
-          simp
-          intro h_z_og_sq
-          rw [pow_two, mul_self_eq_zero] at h_z_og_sq
-          contradiction
-        by_cases hz : z_og = 0
-        · left
-          simp [hz]
-        · right
-          exact h_second_case hz
+      grind
 
     have h_y : y_new = y_og := by
       have h_y_formula : y_new = s.r * Real.sin s.theta * Real.sin s.phi := by (simp [y_new, Spherical.y]; rfl)
       simp [h_y_formula, h_theta_def, h_phi_def]
       simp [Real.sin_arccos, sin_atan2]
-      by_cases h_non_empty : y_og ≠ 0 ∨ x_og ≠ 0
-      · simp [h_non_empty, r, h_r_def]
-        field_simp
-        simp [Real.sq_sqrt, h_sum_sq_non_neg]
-        by_cases h_y_zero : y_og = 0
-        · simp [h_y_zero]
-        · simp [mul_div_assoc]
-          rw [mul_assoc]
-          change y_og * large_term = y_og
-          simp [h_large_term_one (Or.comm.mp h_non_empty)]
-      · simp [h_non_empty]
-        push_neg at h_non_empty
-        simp [h_non_empty.1]
+      grind
 
     have h_z : z_new = z_og := by
       have h_z_formula : z_new = s.r * Real.cos s.theta := (by simp [z_new, Spherical.z]; rfl)
-
       simp [h_z_formula, h_theta_def]
       have h_abs_z_over_r_bounds : abs (z_og / r) ≤ 1 := abs_z_over_r_bounds x_og y_og z_og r (by simp [h_r_def, pow_two]) h_r
       simp [Real.cos_arccos, h_abs_z_over_r_bounds, abs_le.mp, r] -- |z / r| < 1 thingy
       field_simp [h_r, r]
 
-    change v_new = v
-    exact equal_Vec3s v_new v (by simp [h_x, x_og, x_new]) (by simp [h_y, y_og, y_new]) (by simp [h_z, z_og, z_new])
+    simpa using equal_Vec3s v_new v (by simp [h_x, x_og, x_new]) (by simp [h_y, y_og, y_new]) (by simp [h_z, z_og, z_new])
 
 lemma r_new_def (v : Vec3) : (Vec3.toSpherical v).r = √(Spherical.x v * Spherical.x v + Spherical.y v * Spherical.y v + Spherical.z v * Spherical.z v) := by
   simp [Vec3.toSpherical]
@@ -621,6 +482,23 @@ lemma sin_zero_eq_zero_pi_right (x : ℝ) (h_x_bounds : -Real.pi < x ∧ x ≤ R
 lemma sin_zero_eq_zero_pi_iff (x : ℝ) (h_x_bounds : -Real.pi < x ∧ x ≤ Real.pi) : sin x = 0 ↔ x = 0 ∨ x = Real.pi := by
   exact Iff.intro (sin_zero_eq_zero_pi_right x h_x_bounds) (sin_zero_eq_zero_pi_left x)
 
+lemma sin_theta_pos' (s : Spherical) : sin s.theta ≠ 0 → 0 < sin s.theta := by
+  intro h_sin_theta
+
+  have h_theta_not_zero_or_pi : ¬(s.theta = 0 ∨ s.theta = Real.pi) := by
+    intro h_theta_zero_or_pi
+    have h_sin_theta_zero : sin s.theta = 0 := by
+      cases h_theta_zero_or_pi with
+      | inl h_zero => simp [h_zero]
+      | inr h_pi => simp [h_pi]
+    exact (h_sin_theta h_sin_theta_zero).elim
+
+  push_neg at h_theta_not_zero_or_pi
+  have h_theta_bounds : 0 < s.theta ∧ s.theta < Real.pi := by
+    simp [(lt_of_le_of_ne s.theta_bounds.1 h_theta_not_zero_or_pi.1.symm), (lt_of_le_of_ne s.theta_bounds.2 h_theta_not_zero_or_pi.2)]
+
+  exact sin_pos_of_pos_of_lt_pi h_theta_bounds.1 h_theta_bounds.2
+
 lemma toVec3_rightInverse_on_radial_distance
   (s_og : Spherical) (s_new : Spherical) (v : Vec3) (x y z : ℝ)
   (h_x : x = Spherical.x v) (h_x_def : x = s_og.r * Real.sin s_og.theta * Real.cos s_og.phi)
@@ -632,17 +510,10 @@ lemma toVec3_rightInverse_on_radial_distance
     have h_r_new_def : s_new.r = √(Spherical.x v * Spherical.x v + Spherical.y v * Spherical.y v + Spherical.z v * Spherical.z v) := by
       rw [h_s_new]
       exact r_new_def v
-
     simp [h_r_new_def]
 
-    --by_cases h_r_def_zero : √(Spherical.x v * Spherical.x v + Spherical.y v * Spherical.y v + Spherical.z v * Spherical.z v) = 0
     by_cases h_r_zero : s_og.r = 0
-    · simp [h_r_zero]
-      have h_x_zero : x = 0 := by simp [h_x_def, h_r_zero]
-      have h_y_zero : y = 0 := by simp [h_y_def, h_r_zero]
-      have h_z_zero : z = 0 := by simp [h_z_def, h_r_zero]
-      rw [← h_x, ← h_y, ← h_z, h_x_zero, h_y_zero, h_z_zero]
-      norm_num
+    · grind
     · by_cases h_theta_values : s_og.theta = 0 ∨ s_og.theta = Real.pi
       · cases h_theta_values with
         | inl h_theta_zero =>
@@ -699,22 +570,17 @@ lemma toVec3_rightInverse_on_radial_distance
           have h_sin_phi_non_zero : sin s_og.phi ≠ 0 := by
             have h_sin_phi_pos : sin s_og.phi = 0 ↔ s_og.phi = 0 := by
               exact sin_eq_zero_iff_of_lt_of_lt (s_og.phi_bounds.1) (lt_of_le_of_ne s_og.phi_bounds.2 h_phi_values.2)
-            change ¬ sin s_og.phi = 0
-            rw [Iff.not h_sin_phi_pos]
-            push_neg
-            simp [h_phi_values]
+            grind
 
           have h_y_non_zero : y ≠ 0 := by
             rw [h_y_def, mul_comm]
             exact mul_ne_zero h_sin_phi_non_zero (mul_ne_zero h_r_zero h_sin_theta_non_zero.symm)
-          rw [← pow_two, ← pow_two, ← pow_two]
-          change s_og.r = √(x^2 + y^2 + z^2)
-          rw [h_x_def, h_y_def, h_z_def]
+          rw [← pow_two, ← pow_two, ← pow_two, h_x_def, h_y_def, h_z_def]
           field_simp
           simp [sqrt_sq s_og.r_bounds]
 
 lemma toVec3_rightInverse_on_theta
-  (s_og : Spherical) (s_new : Spherical) (v : Vec3) (x y z : ℝ)
+  (s_og : Spherical) (s_new : Spherical) (v : Vec3) (z : ℝ)
   (h_z : z = Spherical.z v) (h_z_def : z = s_og.r * Real.cos s_og.theta)
   (h_s_new : s_new = Vec3.toSpherical v)
   (h_r_same : s_og.r = s_new.r) :
@@ -739,10 +605,9 @@ lemma toVec3_rightInverse_on_theta
       exact (arccos_cos (s_og.theta_bounds.1) (s_og.theta_bounds.2)).symm
 
 lemma toVec3_rightInverse_on_phi
-  (s_og : Spherical) (s_new : Spherical) (v : Vec3) (x y z : ℝ)
+  (s_og : Spherical) (s_new : Spherical) (v : Vec3) (x y : ℝ)
   (h_x : x = Spherical.x v) (h_x_def : x = s_og.r * Real.sin s_og.theta * Real.cos s_og.phi)
   (h_y : y = Spherical.y v) (h_y_def : y = s_og.r * Real.sin s_og.theta * Real.sin s_og.phi)
-  (h_z : z = Spherical.z v) (h_z_def : z = s_og.r * Real.cos s_og.theta)
   (h_s_new : s_new = Vec3.toSpherical v)
   (h_r_same : s_og.r = s_new.r)
   (h_phi_bounds : -Real.pi < s_og.phi ∧ s_og.phi ≤ Real.pi) :
@@ -760,26 +625,7 @@ lemma toVec3_rightInverse_on_phi
     · push_neg at h_r_zero
       have h_r_new_non_zero : s_new.r ≠ 0 := by rw [← h_r_same]; exact h_r_zero
       have h_r_new_non_zero : s_new.r ≠ 0 := (by rw [← h_r_same]; simp [h_r_zero])
-      simp [h_r_new_non_zero, ← h_r_new_def, atan2]
-
-      have h_sin_theta_pos' : sin s_og.theta ≠ 0 → 0 < sin s_og.theta := by
-        intro h_sin_theta
-
-        have h_theta_not_zero_or_pi : ¬(s_og.theta = 0 ∨ s_og.theta = Real.pi) := by
-          intro h_theta_zero_or_pi
-          have h_sin_theta_zero : sin s_og.theta = 0 := by
-            cases h_theta_zero_or_pi with
-            | inl h_zero => simp [h_zero]
-            | inr h_pi => simp [h_pi]
-          exact (h_sin_theta h_sin_theta_zero).elim
-
-        push_neg at h_theta_not_zero_or_pi
-        have h_theta_bounds : 0 < s_og.theta ∧ s_og.theta < Real.pi := by
-          change 0 < s_og.theta ∧ s_og.theta < π
-          change s_og.theta ≠ 0 ∧ s_og.theta ≠ π at h_theta_not_zero_or_pi
-          simp [(lt_of_le_of_ne s_og.theta_bounds.1 h_theta_not_zero_or_pi.1.symm), (lt_of_le_of_ne s_og.theta_bounds.2 h_theta_not_zero_or_pi.2)]
-
-        exact sin_pos_of_pos_of_lt_pi h_theta_bounds.1 h_theta_bounds.2
+      simp [← h_r_new_def, atan2]
 
       by_cases h_atan2_case : Spherical.y v = 0 ∧ Spherical.x v < 0
       · simp [h_atan2_case]
@@ -789,32 +635,22 @@ lemma toVec3_rightInverse_on_phi
               simp [h_x_def, h_sin_theta, ← h_x]
             linarith
           · push_neg at h_sin_theta
-            have h_sin_phi_zero : sin s_og.phi = 0 := by
-              have h_y_def_zero : s_og.r * sin s_og.theta * sin s_og.phi = 0 := by
-                rw [← h_y_def]
-                simp [h_atan2_case.1, h_y]
-              have h_product_non_zero : s_og.r * sin s_og.theta ≠ 0 := mul_ne_zero h_r_zero h_sin_theta
-              rw [mul_comm] at h_y_def_zero
-              simp [eq_zero_of_ne_zero_of_mul_right_eq_zero (h_product_non_zero) (h_y_def_zero)]
-
+            have h_sin_phi_zero : sin s_og.phi = 0 := by grind
             have h_phi_zero_or_pi : s_og.phi = 0 ∨ s_og.phi = Real.pi := (sin_zero_eq_zero_pi_iff s_og.phi s_og.phi_bounds).mp h_sin_phi_zero
 
             have h_phi_non_zero : s_og.phi ≠ 0 := by
               have h_cos_phi_lt_zero : cos s_og.phi < 0 := by
 
                 have h_x_def_lt_zero : s_og.r * sin s_og.theta * cos s_og.phi < 0 := by
-
                   rw [← h_x_def, h_x]
                   exact h_atan2_case.2
-
                 have h_sin_theta_pos : 0 < sin s_og.theta := by
-                  exact h_sin_theta_pos' h_sin_theta
+                  exact sin_theta_pos' s_og h_sin_theta
 
                 rw [mul_comm] at h_x_def_lt_zero
 
                 have h_product_pos : 0 < s_og.r * sin s_og.theta := by
                   simp [lt_of_le_of_ne s_og.r_bounds h_r_zero.symm, h_sin_theta_pos]
-
                 nlinarith [h_product_pos, h_x_def_lt_zero]
 
               have h_phi_zero_case : s_og.phi = 0 → ¬(cos s_og.phi < 0) := by
@@ -842,11 +678,9 @@ lemma toVec3_rightInverse_on_phi
 
         by_cases h_theta_zero : s_og.theta = 0
         · simp [h_theta_zero]
-          change s_og.phi = 0
           exact s_og.theta_zero_bound h_theta_zero
         · by_cases h_theta_pi : s_og.theta = Real.pi
           · simp [h_theta_pi]
-            change s_og.phi = 0
             exact s_og.theta_pi_bound h_theta_pi
           · push_neg at h_theta_zero
             push_neg at h_theta_pi
@@ -875,11 +709,7 @@ lemma toVec3_rightInverse_on_phi
               have h_x_lt_zero : x < 0 := by
                 rw [h_x_def, mul_comm]
                 simp [h_phi_pi, h_product_pos]
-
-              rw [h_y] at h_y_zero
-              rw [h_x] at h_x_lt_zero
-              have h_xy : Spherical.y v = 0 ∧ Spherical.x v < 0 := And.intro h_y_zero h_x_lt_zero
-              exact h_atan2_case h_xy
+              grind
 
             have h_phi_restrictive_bounds : -π < s_og.phi ∧ s_og.phi < π := by
               constructor
@@ -915,20 +745,11 @@ theorem toVec3_rightInverse : Function.RightInverse toVec3 Vec3.toSpherical := b
   let z := Spherical.z v
 
   have h_x_def : x = r_og * Real.sin theta_og * Real.cos phi_og := by
-    simp [x]
-    change Spherical.x s_og.toVec3 = r_og * sin s_og.theta * cos s_og.phi
-    change s_og.r * sin s_og.theta * cos s_og.phi = r_og * sin s_og.theta * cos s_og.phi
-    simp [r_og]
+    simp [x, toVec3, v, Spherical.x, r_og, theta_og, phi_og]
   have h_y_def : y = r_og * Real.sin theta_og * Real.sin phi_og := by
-    simp [y]
-    change Spherical.y s_og.toVec3 = r_og * sin s_og.theta * sin s_og.phi
-    change s_og.r * sin s_og.theta * sin s_og.phi = r_og * sin s_og.theta * sin s_og.phi
-    simp [r_og]
+    simp [y, toVec3, v, Spherical.y, r_og, theta_og, phi_og]
   have h_z_def : z = r_og * Real.cos theta_og := by
-    simp [z]
-    change Spherical.z s_og.toVec3 = r_og * cos s_og.theta
-    change s_og.r * cos s_og.theta = r_og * cos s_og.theta
-    simp [r_og]
+    simp [z, toVec3, v, Spherical.z, r_og, theta_og]
 
   let s_new := v.toSpherical
   let r_new := s_new.r
@@ -938,24 +759,20 @@ theorem toVec3_rightInverse : Function.RightInverse toVec3 Vec3.toSpherical := b
     exact r_new_def v
 
   have h_r_same : r_og = r_new := by
-    change s_og.r = s_new.r
-    exact toVec3_rightInverse_on_radial_distance s_og s_new v x y z rfl rfl rfl rfl rfl rfl rfl
+    simpa using toVec3_rightInverse_on_radial_distance s_og s_new v x y z rfl rfl rfl rfl rfl rfl rfl
 
   have h_theta_same : theta_og = theta_new := by
-    exact toVec3_rightInverse_on_theta s_og s_new v x y z rfl rfl rfl h_r_same
+    exact toVec3_rightInverse_on_theta s_og s_new v z rfl rfl rfl h_r_same
 
   have h_phi_bounds : -Real.pi < phi_og ∧ phi_og ≤ Real.pi := s_og.phi_bounds
 
   have h_phi_same : phi_og = phi_new := by
-    exact toVec3_rightInverse_on_phi s_og s_new v x y z rfl rfl rfl rfl rfl rfl rfl h_r_same h_phi_bounds
+    exact toVec3_rightInverse_on_phi s_og s_new v x y rfl rfl rfl rfl rfl h_r_same h_phi_bounds
 
   change s_new = s_og
-  change s_og.r = s_new.r at h_r_same
-  change s_og.theta = s_new.theta at h_theta_same
-  change s_og.phi = s_new.phi at h_phi_same
   cases s_og
 
-  simp at h_r_same h_theta_same h_phi_same
+  simp [s_new, r_og, r_new, theta_og, theta_new, phi_og, phi_new] at h_r_same h_theta_same h_phi_same ⊢
   simp [h_r_same, h_theta_same, h_phi_same]
 
 theorem toVec3_inverse_Vec3.toSpherical :
@@ -1007,6 +824,124 @@ noncomputable def unitSphericalVector (s : Spherical) : Spherical :=
     theta_zero_bound := s.theta_zero_bound,
     theta_pi_bound := s.theta_pi_bound
   }
+
+noncomputable def x_hat : Vec3 := ⟨![1,0,0]⟩
+noncomputable def y_hat : Vec3 := ⟨![0,1,0]⟩
+noncomputable def z_hat : Vec3 := ⟨![0,0,1]⟩
+
+noncomputable def r_hat (s : Spherical) : Vec3 :=
+  ⟨![
+    sin s.theta * cos s.phi,
+    sin s.theta * sin s.phi,
+    cos s.theta
+  ]⟩
+
+noncomputable def theta_hat (s : Spherical) : Vec3 :=
+  ⟨![
+    cos s.theta * cos s.phi,
+    cos s.theta * sin s.phi,
+    -sin s.theta
+  ]⟩
+
+noncomputable def phi_hat (s : Spherical) : Vec3 :=
+  ⟨![
+    -sin s.phi,
+    cos s.phi,
+    0
+  ]⟩
+
+noncomputable def Vec3_to_radial_distance (v : Vec3) : ℝ :=
+  (Vec3.toSpherical v).r
+
+theorem r_on_toSpherical: (r ∘ Vec3.toSpherical) = fun v => √((x v)^2 + (y v)^2 + (z v)^2) := by
+  funext v
+  let r_temp := √((x v)^2 + (y v)^2 + (z v)^2)
+  by_cases r_temp = 0
+  · simp [Vec3.toSpherical, ← pow_two]
+    grind
+  · simp [Vec3.toSpherical, ← pow_two]
+    grind
+
+theorem phi_on_toSpherical : (phi ∘ Vec3.toSpherical) = fun v => atan2 (y v) (x v) := by
+  funext v
+  simp [Vec3.toSpherical]
+  let r_temp := √((x v)^2 + (y v)^2 + (z v)^2)
+  by_cases h_r : √((x v)^2 + (y v)^2 + (z v)^2) = 0
+  · simp [h_r, ← pow_two]
+    rw [atan2]
+    have h_xyz : x v = 0 ∧ y v = 0 ∧ z v = 0 := by
+      apply r_zero_then_Vec3_zero r_temp (x v) (y v) (z v)
+      simp [r_temp, ← pow_two, h_r]
+      grind
+    simp [h_xyz]
+  · simp [← pow_two, h_r]
+
+open Space
+
+lemma x_space_def (v : Vec3) : x v = (v.val 0) := by rfl
+lemma y_space_def (v : Vec3) : y v = (v.val 1) := by rfl
+lemma z_space_def (v : Vec3) : z v = (v.val 2) := by rfl
+
+theorem spherical_r_dx (v : Vec3) (h_v_non_zero : v ≠ 0) : ∂[0] (r ∘ Vec3.toSpherical) v = (x v) / √((x v)^2 + (y v)^2 + (z v)^2) := by
+  rw [r_on_toSpherical]
+  simp [sqrt_eq_rpow]
+  simp [Space.deriv]
+  generalize h_u : (2⁻¹ : ℝ)  = u
+
+  have h_s :
+    (fun v => (x v ^ 2 + y v ^ 2 + z v ^ 2) ^ u) = (fun w => w ^ u) ∘ (fun v => x v ^ 2 + y v ^ 2 + z v ^ 2) := by
+      rfl
+
+  rw [h_s]
+  rw [fderiv_comp (g := fun w : ℝ => w ^ u) (f := fun v : Vec3 => x v ^ 2 + y v ^ 2 + z v ^ 2) (x := v) sorry sorry]
+  simp [ContinuousLinearMap.comp_apply]
+  have h_deriv_1 : (fderiv ℝ (fun v => x v ^ 2 + y v ^ 2 + z v ^ 2) v) (basis 0) = 2 * x v := by
+    change (fderiv ℝ ((fun v => x v ^ 2) + (fun v => y v ^ 2) + (fun v => z v ^ 2)) v) (basis 0) = 2 * x v
+    rw [fderiv_add, fderiv_add]
+    rw [fderiv_pow, fderiv_pow, fderiv_pow]
+    simp [← deriv_eq_fderiv_basis]
+
+    have h_x : x = fun v => v 0 := rfl
+    have h_y : y = fun v => v 1 := rfl
+    have h_z : z = fun v => v 2 := rfl
+
+    rw [h_x, h_y, h_z, Space.deriv_component 0 0 v, Space.deriv_component 1 0 v, Space.deriv_component 2 0 v]
+    simp
+
+
+
+    exact differentiableAt_fst
+    simp [Vec3, z_space_def, Space, differentiableAt_fst]
+
+
+  simp [h_deriv_1]
+
+
+  sorry
+
+theorem spherical_phi_dx (v : Vec3) (h_atan2_case : y v = 0 ∧ x v < 0) : ∂[0] (phi ∘ Vec3.toSpherical) v = -(y v) / ((x v)^2 + (y v)^2) := by
+  have h_always_pi : (phi ∘ Vec3.toSpherical) v = π := by
+    simp [atan2, Vec3.toSpherical]
+    have h_x_non_zero : x v ≠ 0 := ne_of_lt h_atan2_case.2
+    have h_sum_sq_ne_zero : x v * x v + y v * y v + z v * z v ≠ 0 := by
+      simp [← pow_two]
+      exact sum_triple_sq_non_zero (x v) (y v) (z v) (by simp [h_x_non_zero])
+    have h_sqrt_sum_sq_ne_zero : √(x v * x v + y v * y v + z v * z v) ≠ 0 := by
+      have h_sqrt_sum_sq_ne_zero : x v * x v + y v * y v + z v * z v ≥ 0 := by
+        nlinarith
+      let sum := x v * x v + y v * y v + z v * z v
+      apply (sqrt_ne_zero h_sqrt_sum_sq_ne_zero).mpr
+      simp [h_sum_sq_ne_zero]
+    simp [h_sqrt_sum_sq_ne_zero]
+    grind
+  simp [Space.deriv, h_atan2_case]
+
+  rw [h_always_pi]
+
+
+  exact fderiv_val2_here
+  · sorry
+
 
 end Spherical
 end PhysLean.Mathematics.SphericalCoordinates
