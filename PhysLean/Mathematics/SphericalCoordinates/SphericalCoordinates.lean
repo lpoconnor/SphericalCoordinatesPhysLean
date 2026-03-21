@@ -982,7 +982,7 @@ theorem spherical_r_dx (v : Vec3) (h_v_non_zero : v ≠ 0) : ∂[0] (r ∘ Vec3.
   grind
   grind
 
-lemma atan2_interior_dx (v : Vec3) : (fderiv ℝ (fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) v) (basis 0) = - (y v) / (√((x v)^2 + (y v)^2) * (√((x v)^2 + (y v)^2) + (x v))) := by
+lemma atan2_interior_dx (v : Vec3) (h_y_non_zero : y v ≠ 0) : (fderiv ℝ (fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) v) (basis 0) = - (y v) / (√((x v)^2 + (y v)^2) * (√((x v)^2 + (y v)^2) + (x v))) := by
   have h_inverse : (fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) = (fun v => y v * (√(x v ^ 2 + y v ^ 2) + x v)⁻¹) := by
     rfl
   simp [h_inverse]
@@ -991,7 +991,24 @@ lemma atan2_interior_dx (v : Vec3) : (fderiv ℝ (fun v => y v / (√(x v ^ 2 + 
     rfl
   rw [h_split_f_mul]
 
-  rw [fderiv_mul (𝕜 := ℝ) (c := fun v => y v) (d := fun v => (√(x v ^ 2 + y v ^ 2) + x v)⁻¹) (x := v) sorry sorry]
+  have h_sum_non_zero : x v ^ 2 + y v ^ 2 ≠ 0 := by
+    have h_y_pos : 0 < (y v) ^ 2 := by
+      apply sq_pos_of_ne_zero
+      simp [h_y_non_zero]
+    have h_x_nonneg : 0 ≤ x v ^ 2 := by nlinarith
+    nlinarith [h_y_pos, h_y_non_zero]
+  have h_sum_sq_non_zero : √(x v ^ 2 + y v ^ 2) ≠ 0 := by
+    rw [sqrt_ne_zero]
+    exact h_sum_non_zero
+    nlinarith
+  have h_clm_non_zero : (coordCLM 0) v ^ 2 + (coordCLM 1) v ^ 2 ≠ 0 := by
+    rw [← x_clm, ← y_clm]
+    grind
+  have h_denom_pos : 0 < √((x v)^2 + (y v)^2) + (x v) := by exact sqrt_x2_y2_add_x_ne_zero (x := x v) (y := y v) (by apply lt_of_le_of_ne; nlinarith; exact h_sum_non_zero.symm) (by right; exact h_y_non_zero)
+  have h_denom_non_zero : 0 ≠ √((x v)^2 + (y v)^2) + (x v) := by nlinarith [h_denom_pos]
+
+  rw [fderiv_mul (𝕜 := ℝ) (c := fun v => y v) (d := fun v => (√(x v ^ 2 + y v ^ 2) + x v)⁻¹) (x := v) (by rw [y_clm]; fun_prop)
+      (by rw [x_clm, y_clm]; apply DifferentiableAt.inv; simp; apply DifferentiableAt.sqrt; apply DifferentiableAt.add; simp; apply DifferentiableAt.pow; simp; exact h_clm_non_zero; rw [← x_clm, ← y_clm]; exact h_denom_non_zero.symm)]
 
   have h_deriv_1 : fderiv ℝ (fun v => y v) v (basis 0) = 0 := by
     rw [← deriv_eq_fderiv_basis, y_func, Space.deriv_component 1 0 v]
@@ -1007,7 +1024,7 @@ lemma atan2_interior_dx (v : Vec3) : (fderiv ℝ (fun v => y v / (√(x v ^ 2 + 
     have h_deriv_2_sub : fderiv ℝ (fun v => √(x v ^ 2 + y v ^ 2) + x v) v (basis 0) = ((x v) + √((x v)^2 + (y v)^2)) / (√((x v)^2 + (y v)^2)) := by
       have h_fun_sum : (fun v => √(x v ^ 2 + y v ^ 2) + x v) = (fun v => √(x v ^ 2 + y v ^ 2)) + (fun v => x v) := by rfl
       rw [h_fun_sum]
-      rw [fderiv_add (𝕜 := ℝ) (f := fun v => √(x v ^ 2 + y v ^ 2)) (g := fun v => x v) (x := v) sorry sorry]
+      rw [fderiv_add (𝕜 := ℝ) (f := fun v => √(x v ^ 2 + y v ^ 2)) (g := fun v => x v) (x := v) (by rw [x_clm, y_clm]; apply DifferentiableAt.sqrt; apply DifferentiableAt.add; apply DifferentiableAt.pow; simp; apply DifferentiableAt.pow; simp; exact h_clm_non_zero) (by rw [x_clm]; fun_prop)]
       simp
       have h_deriv_2_sub_a : (fderiv ℝ (fun v => x v)) v (basis 0) = 1 := by
         rw [← deriv_eq_fderiv_basis, x_func, Space.deriv_component 0 0 v]
@@ -1040,28 +1057,112 @@ lemma atan2_interior_dx (v : Vec3) : (fderiv ℝ (fun v => y v / (√(x v ^ 2 + 
           · rw [y_clm]
             fun_prop
 
-      simp [h_deriv_2_sub_a, h_deriv_2_sub_b]
-      simp [one_add_div]
+        simp [h_diff_1, sqrt_eq_rpow, h_sum_non_zero]
+        rw [← one_div, ← sqrt_eq_rpow]
+        norm_num
+        rw [rpow_neg, ← one_div, ← sqrt_eq_rpow]
+        grind
+        nlinarith
+        · rw [x_clm, y_clm]
+          have h_sub_diff : DifferentiableAt ℝ (fun w => w) ((coordCLM 0) v ^ 2 + (coordCLM 1) v ^ 2) := by
+            fun_prop
+          exact DifferentiableAt.sqrt h_sub_diff h_clm_non_zero
+        · rw [x_clm, y_clm]
+          fun_prop
 
-    sorry
+      simp [h_deriv_2_sub_a, h_deriv_2_sub_b]
+      grind
+
+    simp [h_deriv_2_sub]
+    rw [← one_div]
+
+    grind
+    · rw [x_clm, y_clm]
+      have h_sub_diff : DifferentiableAt ℝ (fun w => w) (√((coordCLM 0) v ^ 2 + (coordCLM 1) v ^ 2) + (coordCLM 0) v) := by
+        fun_prop
+      exact DifferentiableAt.inv h_sub_diff (by rw [← x_clm, ← y_clm]; exact h_denom_non_zero.symm)
+    · rw [x_clm, y_clm]
+      simp
+      apply DifferentiableAt.sqrt
+      fun_prop
+      exact h_clm_non_zero
 
   simp [h_deriv_1, h_deriv_2]
-  sorry
+  grind
 
-theorem atan2_case_dx (v : Vec3) : ∂[0] (fun v => 2 * Real.arctan (y v / (Real.sqrt ((x v)^2 + (y v)^2) + (x v)))) v = - (y v) / ((x v)^2 + (y v)^2) := by
+theorem atan2_case_dx (v : Vec3) (h_y_non_zero : y v ≠ 0) : ∂[0] (fun v => 2 * Real.arctan (y v / (Real.sqrt ((x v)^2 + (y v)^2) + (x v)))) v = - (y v) / ((x v)^2 + (y v)^2) := by
   rw [Space.deriv]
-
   have h_s :
     (fun v => 2 * arctan (y v / (√(x v ^ 2 + y v ^ 2) + x v))) = (fun w => 2 * arctan w ) ∘ (fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) := by
       rfl
 
   simp [h_s]
-  rw [fderiv_comp (g := fun w : ℝ => 2 * arctan w) (f := fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) (x := v) sorry sorry]
+
+  have h_sum_non_zero : x v ^ 2 + y v ^ 2 ≠ 0 := by
+      have h_y_pos : 0 < (y v) ^ 2 := by
+        apply sq_pos_of_ne_zero
+        simp [h_y_non_zero]
+      have h_x_nonneg : 0 ≤ x v ^ 2 := by nlinarith
+      nlinarith [h_y_pos, h_y_non_zero]
+  have h_sum_sq_non_zero : √(x v ^ 2 + y v ^ 2) ≠ 0 := by
+    rw [sqrt_ne_zero]
+    exact h_sum_non_zero
+    nlinarith
+  have h_denom_pos : 0 < √((x v)^2 + (y v)^2) + (x v) := by exact sqrt_x2_y2_add_x_ne_zero (x := x v) (y := y v) (by apply lt_of_le_of_ne; nlinarith; exact h_sum_non_zero.symm) (by right; exact h_y_non_zero)
+  have h_denom_non_zero : 0 ≠ √((x v)^2 + (y v)^2) + (x v) := by nlinarith [h_denom_pos]
+
+  have h_clm_non_zero : (coordCLM 0) v ^ 2 + (coordCLM 1) v ^ 2 ≠ 0 := by
+    rw [← x_clm, ← y_clm]
+    grind
+
+  have h_diffAt_one : DifferentiableAt ℝ (fun w => 2 * arctan w) ((fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) v) := by
+    simp
+    rw [x_clm, y_clm]
+    refine
+      DifferentiableAt.fun_comp'
+        ((coordCLM 1) v / (√((coordCLM 0) v ^ 2 + (coordCLM 1) v ^ 2) + (coordCLM 0) v)) ?_ ?_
+    fun_prop
+    apply DifferentiableAt.arctan
+    fun_prop
+
+  have h_diffAt_two :  DifferentiableAt ℝ (fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) v := by
+    rw [x_clm, y_clm]
+    refine DifferentiableAt.fun_mul ?_ ?_
+    simp
+    apply DifferentiableAt.inv
+    simp
+    apply DifferentiableAt.sqrt
+    apply DifferentiableAt.add
+    fun_prop
+    fun_prop
+    exact h_clm_non_zero
+    rw [← x_clm, ← y_clm]
+    exact h_denom_non_zero.symm
+
+  rw [fderiv_comp (g := fun w : ℝ => 2 * arctan w) (f := fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) (x := v) h_diffAt_one h_diffAt_two]
   simp [ContinuousLinearMap.comp_apply]
 
-  have h_deriv : (fderiv ℝ (fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) v) (basis 0) =
+  have h_fderiv : (fderiv ℝ (fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) v) (basis 0) = - (y v) / (√((x v)^2 + (y v)^2) * (√((x v)^2 + (y v)^2) + (x v))) := by exact atan2_interior_dx v h_y_non_zero
+  simp [h_fderiv]
+  rw [← one_div]
 
-  sorry
+  generalize h_u : √(x v ^ 2 + y v ^ 2) = u
+  have h_identity : 1 + (y v / (u + x v))^2 = 2 * u / (u + x v) := by
+    rw [div_pow]
+    nth_rw 2 [pow_two]
+    rw [← one_div_mul_eq_div]
+    field_simp
+    rw [← div_self (a := (u + x v) ^ 2), ← add_div]
+    apply eq_div_of_mul_eq
+    grind
+    rw [pow_two]
+    field_simp
+    rw [← h_u]
+    field_simp
+    grind
+    grind
+
+  grind
 
 theorem spherical_phi_dx (v : Vec3) (h_v_non_zero : v ≠ 0) (h_y_non_zero : y v ≠ 0) : ∂[0] (phi ∘ Vec3.toSpherical) v = -(y v) / ((x v)^2 + (y v)^2) := by
   simp [Space.deriv, phi_on_toSpherical, atan2]
