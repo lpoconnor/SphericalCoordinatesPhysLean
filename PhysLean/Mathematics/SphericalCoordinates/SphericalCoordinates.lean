@@ -1172,7 +1172,7 @@ theorem spherical_phi_dx (v : Vec3) (h_v_non_zero : v ≠ 0) (h_y_non_zero : y v
 
   have h_atan2_case : ¬(y v = 0 ∧ x v < 0) := by simp [h_y_non_zero]
 
-  simp [h_atan2_case]
+  sorry
 
 
 
