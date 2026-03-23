@@ -9,10 +9,16 @@ import PhysLean.Meta.TODO.Basic
 import PhysLean.SpaceAndTime.Space.Basic
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Inverse
+import Mathlib.Analysis.SpecialFunctions.Trigonometric.InverseDeriv
 import Mathlib.Algebra.Group.Basic
 import Mathlib.Order.Defs.PartialOrder
 import Mathlib.Tactic.LinearCombination'
 import PhysLean.SpaceAndTime.Space.Derivatives.Basic
+import Mathlib.Analysis.Calculus.Deriv.Basic
+import Mathlib.Topology.Basic
+import Mathlib.Topology.Algebra.FilterBasis
+import Mathlib.Topology.Defs.Filter
+
 namespace PhysLean.Mathematics.SphericalCoordinates
 
 --#count_heartbeats
@@ -330,6 +336,17 @@ lemma sum_triple_sqrt_non_zero (x y z : ℝ) (h_xyz : x ≠ 0 ∨ y ≠ 0 ∨ z 
   have h_xyz_pos : x^2 + y^2 + z^2 ≥ 0 := by nlinarith
   simp [sqrt_ne_zero h_xyz_pos, sum_triple_sq_non_zero x y z h_xyz]
 
+lemma r_non_zero (x y z : ℝ) (h_xyz : x ≠ 0 ∨ y ≠ 0 ∨ z ≠ 0) : √(x^2 + y^2 + z^2) ≠ 0 := by
+  by_cases h_x : x ≠ 0
+  · exact sum_triple_sqrt_non_zero x y z (by simp [h_x])
+  · by_cases h_y : y ≠ 0
+    · exact sum_triple_sqrt_non_zero x y z (by simp [h_y])
+    · have h_z : z  ≠ 0 := by
+        push_neg at h_x h_y
+        simp [h_x, h_y] at h_xyz
+        simp [h_xyz]
+      exact sum_triple_sqrt_non_zero x y z (by simp [h_z])
+
 lemma cancel_last_term (a b : ℝ) (h_b : b = 1) : a * b = a := by
   simp [h_b]
 
@@ -364,6 +381,14 @@ lemma Vec3_non_empty (v : Vec3) (h_v : v ≠ 0) :
       · simp [z] at h_z
         simp [h_z]
     contradiction
+
+lemma Vec3_non_empty' (v : Vec3) (h_xyz : x v ≠ 0 ∨ y v ≠ 0 ∨ z v ≠ 0 ) :
+  v ≠ 0 := by
+    intro hv
+    have hx : x v = 0 := by exact (AddSemiconjBy.eq_zero_iff (x 0) (congrFun (congrArg HAdd.hAdd (congrArg x (id (Eq.symm hv)))) (x 0))).mp rfl
+    have hy : y v = 0 := by exact (AddSemiconjBy.eq_zero_iff (y 0) (congrFun (congrArg HAdd.hAdd (congrArg y (id (Eq.symm hv)))) (y 0))).mp rfl
+    have hz : z v = 0 := by exact (AddSemiconjBy.eq_zero_iff (z 0) (congrFun (congrArg HAdd.hAdd (congrArg z (id (Eq.symm hv)))) (z 0))).mp rfl
+    rcases h_xyz with h | h | h <;> contradiction
 
 lemma r_zero_then_Vec3_zero (r x y z: ℝ) (h_r_def : r = Real.sqrt (x*x + y*y + z*z)) :
   r = 0 → x = 0 ∧ y = 0 ∧ z = 0 := by
@@ -879,6 +904,11 @@ theorem r_on_toSpherical: (r ∘ Vec3.toSpherical) = fun v => √((x v)^2 + (y v
   · simp [Vec3.toSpherical, ← pow_two]
     grind
 
+theorem theta_on_toSpherical (v : Vec3) (h_v_non_zero : v ≠ 0) : (theta ∘ Vec3.toSpherical) v = (fun v => (arccos ((z v) / √((x v)^2 + (y v)^2 + (z v)^2)))) v := by
+  have h_xyz : x v ≠ 0 ∨ y v ≠ 0 ∨ z v ≠ 0 := by
+    exact Vec3_non_empty v h_v_non_zero
+
+  simp [Vec3.toSpherical, ← pow_two, r_non_zero (x v) (y v) (z v) h_xyz]
 
 theorem phi_on_toSpherical : (phi ∘ Vec3.toSpherical) = fun v => atan2 (y v) (x v) := by
   funext v
@@ -928,11 +958,11 @@ theorem spherical_r_dx (v : Vec3) (h_v_non_zero : v ≠ 0) : ∂[0] (r ∘ Vec3.
     apply (sqrt_ne_zero h_sq_sum_ge_zero).mpr
     exact sum_triple_sq_non_zero (x v) (y v) (z v) h_xyz
 
-  have h_s :
+  have h_split :
     (fun v => (x v ^ 2 + y v ^ 2 + z v ^ 2) ^ u) = (fun w => w ^ u) ∘ (fun v => x v ^ 2 + y v ^ 2 + z v ^ 2) := by
       rfl
 
-  rw [h_s]
+  rw [h_split]
 
   have h_fderiv_diffAt_1 : DifferentiableAt ℝ (fun w => w ^ u) ((fun v => x v ^ 2 + y v ^ 2 + z v ^ 2) v) := by
     rw [x_clm, y_clm, z_clm]
@@ -980,6 +1010,240 @@ theorem spherical_r_dx (v : Vec3) (h_v_non_zero : v ≠ 0) : ∂[0] (r ∘ Vec3.
   rw [rpow_neg, ← sqrt_eq_rpow]
   simp [← div_eq_inv_mul]
   grind
+  grind
+
+open Topology
+
+theorem spherical_theta_dx (v : Vec3) (h_xy : x v ≠ 0 ∨ y v ≠ 0) : ∂[0] (theta ∘ Vec3.toSpherical) v = ((x v) * (z v)) / (((x v)^2 + (y v)^2 + (z v)^2) * √((x v)^2 + (y v)^2)) := by
+  have h_xyz : x v ≠ 0 ∨ y v ≠ 0 ∨ z v ≠ 0 := by
+    cases h_xy with
+    | inl h_x => simp [h_x]
+    | inr h_y => simp [h_y]
+  rw [Space.deriv]
+  have h_r_non_zero := r_non_zero (x v) (y v) (z v) h_xyz
+  have h_fderiv : (theta ∘ Vec3.toSpherical) =ᶠ[𝓝 v] (fun v => arccos (z v / √(x v ^ 2 + y v ^ 2 + z v ^ 2))) := by
+    let s : Set Vec3 := {u | x u ≠ 0 ∨ y u ≠ 0 ∨ z u ≠ 0}
+    let s_sub_x : Set Vec3 := {u | x u ≠ 0}
+    let s_sub_y : Set Vec3 := {u | y u ≠ 0}
+    let s_sub_z : Set Vec3 := {u | z u ≠ 0}
+    have h_s_neighbourhood : s ∈ 𝓝 v := by
+      by_cases h_x : x v ≠ 0
+      · have h_x_continuousAt : ContinuousAt x v := by
+          rw [x_func]
+          fun_prop
+        have h_neighbourhood_condition : ∀ᶠ u in 𝓝 v, x u ≠ 0 := by
+          (expose_names; exact ContinuousAt.eventually_ne h_x_continuousAt h_x)
+        have h_s_small_neighbourhood : s_sub_x ∈ 𝓝 v := by
+          exact h_neighbourhood_condition
+        have s_sub_x_subset_s : s_sub_x ⊆ s :=
+          fun u hu => Or.inl hu
+        exact Filter.mem_of_superset h_neighbourhood_condition s_sub_x_subset_s
+      · by_cases h_y : y v ≠ 0
+        · have h_y_continuousAt : ContinuousAt y v := by
+            rw [y_func]
+            fun_prop
+          have h_neighbourhood_condition : ∀ᶠ u in 𝓝 v, y u ≠ 0 := by
+            (expose_names; exact ContinuousAt.eventually_ne h_y_continuousAt h_y)
+          have h_s_small_neighbourhood : s_sub_y ∈ 𝓝 v := by
+            exact h_neighbourhood_condition
+          have s_sub_y_subset_s : s_sub_y ⊆ s :=
+            fun u hu => Or.inr (Or.inl hu)
+          exact Filter.mem_of_superset h_neighbourhood_condition s_sub_y_subset_s
+        · have h_z : z v ≠ 0 := by simp [h_x, h_y] at h_xyz; push_neg at h_xyz; exact h_xyz
+          have h_z_continuousAt : ContinuousAt z v := by
+            rw [z_func]
+            fun_prop
+          have h_neighbourhood_condition : ∀ᶠ u in 𝓝 v, z u ≠ 0 := by
+            (expose_names; exact ContinuousAt.eventually_ne h_z_continuousAt h_z)
+          have h_s_small_neighbourhood : s_sub_z ∈ 𝓝 v := by
+            exact h_neighbourhood_condition
+          have s_sub_z_subset_s : s_sub_z ⊆ s :=
+            fun u hu => Or.inr (Or.inr hu)
+          exact Filter.mem_of_superset h_neighbourhood_condition s_sub_z_subset_s
+    have h_eq_on_s : Set.EqOn
+      (theta ∘ Vec3.toSpherical)
+      (fun v => arccos (z v / √(x v ^ 2 + y v ^ 2 + z v ^ 2)))
+      s := by
+        intro t h_t
+        rw [theta_on_toSpherical]
+        simp [s] at h_t
+        exact Vec3_non_empty' t h_t
+
+    exact Filter.eventuallyEq_of_mem h_s_neighbourhood h_eq_on_s
+
+  simp [h_fderiv.fderiv_eq]
+
+  have h_split : (fun v => arccos (z v / √(x v ^ 2 + y v ^ 2 + z v ^ 2))) = (fun w => (arccos w)) ∘ (fun v => z v / √(x v ^ 2 + y v ^ 2 + z v ^ 2)) := by
+    rfl
+
+  rw [h_split]
+
+  have h_diffAt_1 : DifferentiableAt ℝ (fun w => arccos w) ((fun v => z v / √(x v ^ 2 + y v ^ 2 + z v ^ 2)) v) := by
+    rw [x_clm, y_clm, z_clm]
+    refine differentiableAt_arccos.mpr ?_
+    constructor
+    · rw [← x_clm, ← y_clm, ← z_clm]
+      field_simp
+      rw [Ne, div_eq_iff]
+      simp
+      intro h_z
+      have h_sq_equal : z v ^ 2 = x v ^ 2 + y v ^ 2 + z v ^ 2 := by
+        simp [pow_two]
+        grind
+      simp at h_sq_equal
+      cases h_xy with
+      | inl h_x =>
+        have h_x_sq : 0 < (x v)^2 := by
+          have h_x_sq_non_zero : 0 ≠ (x v)^2 := by
+            rw [pow_two, ne_comm, mul_self_ne_zero]
+            simp [h_x]
+          have h_x_sq_eq : 0 ≤ (x v)^2 := by nlinarith
+          simp [lt_of_le_of_ne, h_x_sq_non_zero, h_x_sq_eq]
+        have h_y_sq : 0 ≤ (y v)^2 := by nlinarith
+        have h_contr : 0 < (x v)^2 + (y v)^2 := by
+          exact add_pos_of_pos_of_nonneg h_x_sq h_y_sq
+        grind
+      | inr h_y =>
+        have h_y_sq : 0 < (y v)^2 := by
+          have h_y_sq_non_zero : 0 ≠ (y v)^2 := by
+            rw [pow_two, ne_comm, mul_self_ne_zero]
+            simp [h_y]
+          have h_y_sq_eq : 0 ≤ (y v)^2 := by nlinarith
+          simp [lt_of_le_of_ne, h_y_sq_non_zero, h_y_sq_eq]
+        have h_x_sq : 0 ≤ (x v)^2 := by nlinarith
+        have h_contr : 0 < (y v)^2 + (x v)^2 := by
+          exact add_pos_of_pos_of_nonneg h_y_sq h_x_sq
+        grind
+      grind
+    · rw [← x_clm, ← y_clm, ← z_clm]
+      field_simp
+      rw [Ne, div_eq_iff]
+      simp
+      intro h_z
+      have h_sq_equal : z v ^ 2 = x v ^ 2 + y v ^ 2 + z v ^ 2 := by
+        simp [pow_two]
+        grind
+      simp at h_sq_equal
+      cases h_xy with
+      | inl h_x =>
+        have h_x_sq : 0 < (x v)^2 := by
+          have h_x_sq_non_zero : 0 ≠ (x v)^2 := by
+            rw [pow_two, ne_comm, mul_self_ne_zero]
+            simp [h_x]
+          have h_x_sq_eq : 0 ≤ (x v)^2 := by nlinarith
+          simp [lt_of_le_of_ne, h_x_sq_non_zero, h_x_sq_eq]
+        have h_y_sq : 0 ≤ (y v)^2 := by nlinarith
+        have h_contr : 0 < (x v)^2 + (y v)^2 := by
+          exact add_pos_of_pos_of_nonneg h_x_sq h_y_sq
+        grind
+      | inr h_y =>
+        have h_y_sq : 0 < (y v)^2 := by
+          have h_y_sq_non_zero : 0 ≠ (y v)^2 := by
+            rw [pow_two, ne_comm, mul_self_ne_zero]
+            simp [h_y]
+          have h_y_sq_eq : 0 ≤ (y v)^2 := by nlinarith
+          simp [lt_of_le_of_ne, h_y_sq_non_zero, h_y_sq_eq]
+        have h_x_sq : 0 ≤ (x v)^2 := by nlinarith
+        have h_contr : 0 < (y v)^2 + (x v)^2 := by
+          exact add_pos_of_pos_of_nonneg h_y_sq h_x_sq
+        grind
+      grind
+
+  have h_diffAt_2 : DifferentiableAt ℝ (fun v => z v / √(x v ^ 2 + y v ^ 2 + z v ^ 2)) v := by
+    rw [x_clm, y_clm, z_clm]
+    refine DifferentiableAt.fun_mul ?_ ?_
+    fun_prop
+    apply DifferentiableAt.inv
+    apply DifferentiableAt.sqrt
+    fun_prop
+    rw [← x_clm, ← y_clm, ← z_clm]
+    rw [← sqrt_ne_zero (x := x v ^ 2 + y v ^ 2 + z v ^ 2) (by nlinarith)]
+    exact h_r_non_zero
+    rw [← x_clm, ← y_clm, ← z_clm]
+    exact h_r_non_zero
+
+  rw [fderiv_comp (g := fun w : ℝ => (arccos w)) (f := fun v => z v / √(x v ^ 2 + y v ^ 2 + z v ^ 2)) (x := v) h_diffAt_1 h_diffAt_2]
+  simp [ContinuousLinearMap.comp_apply]
+  have h_deriv : (fderiv ℝ (fun v => z v / √(x v ^ 2 + y v ^ 2 + z v ^ 2)) v) (basis 0) = - (x v) * (z v) / (((x v)^2 + (y v)^2 + (z v)^2) * √((x v)^2 + (y v)^2 + (z v)^2)) := by
+    have h_split_sub : (fun v => z v / √(x v ^ 2 + y v ^ 2 + z v ^ 2)) = (fun v => z v) / (fun v => √(x v ^ 2 + y v ^ 2 + z v ^ 2)) := by
+      rfl
+    rw [h_split_sub]
+    simp [div_eq_mul_inv]
+    rw [fderiv_mul]
+    simp
+    have h_split_inv : (fun v => √(x v ^ 2 + y v ^ 2 + z v ^ 2))⁻¹ = (fun w => w⁻¹) ∘ (fun v => √(x v ^ 2 + y v ^ 2 + z v ^ 2)) := by rfl
+    rw [h_split_inv]
+
+    have h_diffAt_sub_1 : DifferentiableAt ℝ (fun w => w⁻¹) ((fun v => √(x v ^ 2 + y v ^ 2 + z v ^ 2)) v) := by
+      rw [x_clm, y_clm, z_clm]
+      refine differentiableAt_inv ?_
+      simp
+      push_neg
+      rw [← x_clm, ← y_clm, ← z_clm]
+      exact h_r_non_zero
+
+    have h_diffAt_sub_2 : DifferentiableAt ℝ (fun v => √(x v ^ 2 + y v ^ 2 + z v ^ 2)) v := by
+      rw [x_clm, y_clm, z_clm]
+      refine DifferentiableAt.sqrt ?_ ?_
+      fun_prop
+      rw [← x_clm, ← y_clm, ← z_clm]
+      rw [← sqrt_ne_zero (x := x v ^ 2 + y v ^ 2 + z v ^ 2) (by nlinarith)]
+      exact h_r_non_zero
+
+    rw [fderiv_comp (g := fun w : ℝ => w⁻¹) (f := fun v => √(x v ^ 2 + y v ^ 2 + z v ^ 2)) (x := v) h_diffAt_sub_1 h_diffAt_sub_2]
+    simp [ContinuousLinearMap.comp_apply]
+    rw [fderiv_sqrt]
+    have h_triple_split : (fun v => x v ^ 2 + y v ^ 2 + z v ^ 2) = (fun v => x v ^ 2) + (fun v => y v ^ 2) + (fun v => z v ^ 2) := by rfl
+    rw [h_triple_split, fderiv_add, fderiv_add, fderiv_pow, fderiv_pow, fderiv_pow, ← deriv_eq_fderiv_basis]
+    rw [x_func, y_func, z_func, Space.deriv_component 2 0 v, ← x_func, ← y_func, ← z_func]
+    simp [← deriv_eq_fderiv_basis]
+    rw [x_func, y_func, z_func, Space.deriv_component 0 0 v, Space.deriv_component 1 0 v, Space.deriv_component 2 0 v, ← x_func, ← y_func, ← z_func]
+    simp
+    rw [sq_sqrt]
+    grind
+    · nlinarith
+    · rw [z_clm]
+      fun_prop
+    · rw [y_clm]
+      fun_prop
+    · rw [x_clm]
+      fun_prop
+    · rw [x_clm]
+      fun_prop
+    · rw [y_clm]
+      fun_prop
+    · rw [x_clm, y_clm]
+      fun_prop
+    · rw [z_clm]
+      fun_prop
+    · rw [x_clm, y_clm, z_clm]
+      fun_prop
+    · grind
+    · rw [z_clm]
+      fun_prop
+    · rw [x_clm, y_clm, z_clm]
+      have h_sum_non_zero : (coordCLM 0) v ^ 2 + (coordCLM 1) v ^ 2 + (coordCLM 2) v ^ 2 ≠ 0 := by
+        rw [← x_clm, ← y_clm, ← z_clm]
+        grind
+      refine DifferentiableAt.inv ?_ ?_
+      apply DifferentiableAt.sqrt
+      fun_prop
+      exact h_sum_non_zero
+      rw [sqrt_ne_zero]
+      exact h_sum_non_zero
+      nlinarith
+
+  simp [h_deriv]
+  field_simp [sq_sqrt, div_zpow]
+  have h_non_neg : 0 ≤ x v ^ 2 + y v ^ 2 + z v ^ 2 := by nlinarith
+  have h_non_zero : 0 ≠ x v ^ 2 + y v ^ 2 + z v ^ 2 := by grind
+  have h_sqrt_non_neg : 0 ≠ √(x v ^ 2 + y v ^ 2 + z v ^ 2) := by
+    rw [ne_comm, sqrt_ne_zero h_non_neg]
+    exact h_non_zero.symm
+  have h_sq : √(x v ^ 2 + y v ^ 2 + z v ^ 2) ^ 2 = x v ^ 2 + y v ^ 2 + z v ^ 2 := by
+    grind
+
+  simp
   grind
 
 lemma atan2_interior_dx (v : Vec3) (h_y_non_zero : y v ≠ 0) : (fderiv ℝ (fun v => y v / (√(x v ^ 2 + y v ^ 2) + x v)) v) (basis 0) = - (y v) / (√((x v)^2 + (y v)^2) * (√((x v)^2 + (y v)^2) + (x v))) := by
@@ -1164,17 +1428,40 @@ theorem atan2_case_dx (v : Vec3) (h_y_non_zero : y v ≠ 0) : ∂[0] (fun v => 2
 
   grind
 
-theorem spherical_phi_dx (v : Vec3) (h_v_non_zero : v ≠ 0) (h_y_non_zero : y v ≠ 0) : ∂[0] (phi ∘ Vec3.toSpherical) v = -(y v) / ((x v)^2 + (y v)^2) := by
+theorem spherical_phi_dx (v : Vec3) (h_y_non_zero : y v ≠ 0) : ∂[0] (phi ∘ Vec3.toSpherical) v = -(y v) / ((x v)^2 + (y v)^2) := by
   simp [Space.deriv, phi_on_toSpherical, atan2]
 
-  have h_xyz : x v ≠ 0 ∨ y v ≠ 0 ∨ z v ≠ 0 := by
-    exact Vec3_non_empty v h_v_non_zero
-
   have h_atan2_case : ¬(y v = 0 ∧ x v < 0) := by simp [h_y_non_zero]
+  have h_atan2_case_dx : ∂[0] (fun v => 2 * Real.arctan (y v / (Real.sqrt ((x v)^2 + (y v)^2) + (x v)))) v = - (y v) / ((x v)^2 + (y v)^2) := by
+    exact atan2_case_dx v h_y_non_zero
+  rw [Space.deriv] at h_atan2_case_dx
 
-  sorry
+  rw [←h_atan2_case_dx]
 
+  have h_neighbourhood :
+  (fun v => if y v = 0 ∧ x v < 0 then π
+  else 2 * Real.arctan (y v / (Real.sqrt (x v ^ 2 + y v ^ 2) + x v)))
+  =ᶠ[𝓝 v]
+  (fun w => 2 * Real.arctan ((y w) / (Real.sqrt (x w ^ 2 + y w ^ 2) + x w))) := by
+    let s : Set Vec3 := {u | (y u) ≠ 0}
+    have h_s_neighbourhood : s ∈ 𝓝 v := by
+      have h_y_continuousAt : ContinuousAt y v := by
+        rw [y_func]
+        fun_prop
+      have h_neighbourhood_condition : ∀ᶠ u in 𝓝 v, y u ≠ 0 := by
+        (expose_names; exact ContinuousAt.eventually_ne h_y_continuousAt h_y_non_zero)
+      exact h_neighbourhood_condition
+    have h_eq_on_s : Set.EqOn
+      (fun v => if y v = 0 ∧ x v < 0 then π else 2 * Real.arctan (y v / (√(x v ^ 2 + y v ^ 2) + x v)))
+      (fun w => 2 * Real.arctan (y w / (√(x w ^ 2 + y w ^ 2) + x w)))
+      s := by
+        intro t h_t
+        simp
+        grind
 
+    exact Filter.eventuallyEq_of_mem h_s_neighbourhood h_eq_on_s
+
+  simp [h_neighbourhood.fderiv_eq]
 
 end Spherical
 end PhysLean.Mathematics.SphericalCoordinates
