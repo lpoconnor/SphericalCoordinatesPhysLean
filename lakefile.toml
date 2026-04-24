@@ -1,0 +1,134 @@
+# === LeanMaster Project (Merged Lakefile) ===
+
+name = "LeanMaster"
+version = "0.1.0"
+defaultTargets = ["LeanMaster"]
+
+# -------------------
+# Libraries
+# -------------------
+[[lean_lib]]
+name = "LeanMaster"
+sourceDir = "LeanMaster"      # your LeanMaster test/source folder
+
+[[lean_lib]]
+name = "PhysLean"
+sourceDir = "PhysLean"        # all PhysLean code flattened here
+
+# -------------------
+# Dependencies
+# -------------------
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4.git"
+rev = "v4.26.0"
+
+[[require]]
+name = "«doc-gen4»"
+git = "https://github.com/leanprover/doc-gen4"
+rev = "v4.26.0"
+
+# -------------------
+# Lean Options
+# -------------------
+[leanOptions]
+warn.sorry = false
+
+# -------------------
+# Scripts (from PhysLean)
+# -------------------
+
+[[lean_exe]]
+name = "check_file_imports"
+srcDir = "PhysLean/scripts"
+
+[[lean_exe]]
+name = "style_lint"
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "type_former_lint"
+srcDir = "PhysLean/scripts"
+
+[[lean_exe]]
+name = "lint_all"
+supportInterpreter = true
+srcDir = "PhysLean/scripts"
+
+[[lean_exe]]
+name = "check_dup_tags"
+supportInterpreter = true
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "sorry_lint"
+supportInterpreter = true
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "runPhysLeanLinters"
+supportInterpreter = true
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "free_simps"
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "spelling"
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "check_rfl"
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "redundant_imports"
+supportInterpreter = true
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "module_doc_lint"
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "stats"
+supportInterpreter = true
+srcDir = "PhysLean/scripts"
+
+[[lean_exe]]
+name = "local_stats"
+supportInterpreter = true
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "make_tag"
+supportInterpreter = true
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "TODO_to_yml"
+supportInterpreter = true
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "informal"
+supportInterpreter = true
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "find_TODOs"
+srcDir = "PhysLean/scripts"
+
+[[lean_exe]]
+name = "notes"
+supportInterpreter = true
+srcDir = "PhysLean/scripts/MetaPrograms"
+
+[[lean_exe]]
+name = "mathlib_textLint_on_hepLean"
+srcDir = "PhysLean/scripts"
+
+[[lean_exe]]
+name = "no_docs"
+srcDir = "PhysLean/scripts/MetaPrograms"
